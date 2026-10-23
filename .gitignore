@@ -1,0 +1,15 @@
+# development material that is not published (notes, dumps, firmware, Live automation, test benches)
+dev/
+# dev-only devices built into dist/ by dev/build.sh
+dist/SidProbe.amxd
+dist/SidFake.amxd
+dist/SidAdsrTest.amxd
+dist/SidPulseTest.amxd
+dist/SidTableTest.amxd
+dist/sid.probe.js
+dist/sid.fake.js
+# generated
+node_modules/
+logs/
+.DS_Store
+__pycache__/

@@ -1,0 +1,13 @@
+{
+  "name": "sidstation-editor",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Max for Live editor for the Elektron SidStation synthesizer",
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "build": "node build/build-station.js",
+    "test": "node --test test/*.test.js",
+    "validate": "node tools/validate-bank.js"
+  },
+  "engines": { "node": ">=24" }
+}

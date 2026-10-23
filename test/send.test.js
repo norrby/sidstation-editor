@@ -1,0 +1,67 @@
+// node --test: max/sid.send.js (the gateway) in a v8 mock – queue, validation, whitelist, stop.
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const { midiParser } = require("../lib/midi");
+const fs = require("fs");
+const path = require("path");
+const { sidlog, sidguard } = require("../lib/maxlog");
+const S = require("../lib/sysex");
+const SidParams = require("../lib/params");
+
+function loadGateway() {
+  const out = [], status = [], sched = [];
+  class Task { constructor(fn) { this.fn = fn; } schedule(ms) { sched.push([this, ms]); } cancel() { this.cancelled = true; } }
+  const g = { midiParser, sidlog, sidguard, ...S, SidParams, Task, File: class {}, inlets: 0, outlets: 0, post() {}, arrayfromargs: (a) => Array.from(a), messagename: "x",
+    outlet: (o, ...a) => { if (o === 0) out.push(a[0]); else if (a[0] === "status") status.push(a[1]); } };
+  const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.send.js"), "utf8").replace(/^inlets = 1;\noutlets = 2;\n/m, "");
+  const fn = new Function(...Object.keys(g), src + "\nreturn { cc, note, pc, dp, frame, stop, send, msg_int, get queue() { return queue; } };");
+  const run = () => { while (sched.length) { const [t] = sched.shift(); if (!t.cancelled) t.fn(); } };   // drain all ticks
+  return { w: fn(...Object.values(g)), out, status, sched, run };
+}
+const DP_TRI = [0xf0, 0x00, 0x20, 0x3c, 0x01, 0x00, 0x04, 0x00, 0x56, 0x0f, 0x04, 0x01, 0xf7];
+
+test("everything goes through one queue: one whole message per tick, in arrival order, with a pause", () => {
+  const { w, out, sched, run } = loadGateway();
+  w.cc(42, 10);
+  assert.deepEqual(out, [0xb0, 42, 10]);                    // the first goes out at once
+  w.frame(...DP_TRI); w.note(60, 100);                     // arrive while the queue waits
+  assert.deepEqual(out, [0xb0, 42, 10]); assert.equal(w.queue.length, 2);
+  assert.equal(sched[0][1], 1);
+  run();
+  assert.deepEqual(out, [0xb0, 42, 10, ...DP_TRI, 0x90, 60, 100]);
+});
+
+test("refuses: DP outside the whitelist, wrong form, foreign SysEx, broken channel message", () => {
+  const { w, out, status, run } = loadGateway();
+  w.dp(0, 86, 15, 0, 1); run();                            // right address, wrong shift
+  w.dp(0, 86, 15, 4, 16); run();                           // value > mask
+  w.frame(0xf0, 0x00, 0x45, 0x01, 0x69, 0x7f, 0xf7); run(); // OS-upgrade-header
+  w.frame(0xb0, 42); run();                                // too short
+  w.frame(0x90, 60, 200); run();                           // data > 7F
+  assert.deepEqual(out, []);
+  assert.equal(status.filter((s) => s.startsWith("REFUSED")).length, 5);
+  w.dp(0, 86, 15, 4, 1); run();
+  assert.deepEqual(out, DP_TRI);
+});
+
+test("stop empties the queue, and a frame that has become invalid stops everything", () => {
+  const { w, out, run } = loadGateway();
+  w.cc(1, 1); w.cc(2, 2); w.cc(3, 3);
+  w.stop();
+  run();
+  assert.deepEqual(out, [0xb0, 1, 1]);
+  assert.equal(w.queue.length, 0);
+});
+
+test("the note path (one track): channel messages go out at once, outside the queue; SysEx never passes", () => {
+  const { w, out, sched } = loadGateway();
+  for (const b of [0x90, 60, 100, 61, 90]) w.msg_int(b);                 // with running status
+  assert.deepEqual(out.splice(0), [0x90, 60, 100, 0x90, 61, 90]);
+  assert.equal(sched.length, 0, "not queued");
+  for (const b of [0xf0, 0x00, 0x20, 0x3c, 0x01, 0x00, 0x01, 0xf7]) w.msg_int(b);   // a "memory clear" frame
+  assert.deepEqual(out, [], "SysEx on the note path is dropped");
+  for (const b of [0xb0, 7]) w.msg_int(b);
+  w.msg_int(0xf8);                                                         // realtime in the middle passes
+  w.msg_int(100);
+  assert.deepEqual(out.splice(0), [0xf8, 0xb0, 7, 100]);
+});
