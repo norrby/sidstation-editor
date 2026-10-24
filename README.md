@@ -14,8 +14,11 @@ Not affiliated with or endorsed by Elektron. Use at your own risk.
 - **Overview** after the SID datasheet's block diagram: oscillators, envelopes, the filter
   routing switches, sync and ring arrows, the patch name in the synth's dot-matrix style.
 - **Oscillators:** waveform, pulse width with its LFO and sync, envelope (ADSR drawn and draggable),
-  vibrato, portamento, transpose, arpeggio, and the wave **table** editor (a small step sequencer
-  per oscillator, with loop and end).
+  vibrato, portamento, transpose, arpeggio.
+- **Waveform tables** (the manual's *Tabl*, the trick behind Rob Hubbard's sounds and the C64's
+  drums): one per oscillator, edited as a step sequencer with waveform, sync, ring and a fixed or
+  relative note per step, played once or looped, at the table's own speed. Pull and Push keep a
+  table exactly as the synth stores it.
 - **Filter:** cutoff, resonance, type, envelope with invert, LFO depth, a live frequency-response
   picture.
 - **LFOs 1–4:** type, speed, depth, fade-in, sample & hold, note-on/off sync, with a curve view.
