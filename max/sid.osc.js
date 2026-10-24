@@ -84,10 +84,14 @@ function param(key, v) {
   v = Math.round(Number(v));
   if (!Number.isFinite(v)) { sidlog("osc" + osc, "invalid value", key, JSON.stringify(raw)); return; }
   v = Math.max(d.min, Math.min(d.max, v));
+  const first = !(key in val);
   val[key] = v;
   // In the SID, ring modulation only acts on the triangle wave: Tri (0) and Mixed (3, Tri+Pulse). Outlet 1 ->
   // the Ring button (active 0/1) and the overview, regardless of arming.
   if (key === "wave") outlet(1, "ringok", v === 0 || v === 3 ? 1 : 0);
+  // The first value of a parameter is what Live restores when the device loads: it is the starting point and never goes
+  // to the synth, whenever it arrives (once it came after "armed" and 155 values overwrote the synth's edit buffer).
+  if (first) { if (armed) sidlog("osc" + osc, "first value kept, not sent:", key, v); return; }
   if (muted()) return;
   if (viaCC(d, v)) { sendCC(SidParams.oscCC(osc, d), SidParams.toCC(v, d.min, ccMax(d))); return; }
   const r = SidParams.oscDP(osc, d);

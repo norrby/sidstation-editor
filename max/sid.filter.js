@@ -44,17 +44,21 @@ function setField(name, value) {
   fields[name] = value;
   if (!muted()) sendField(name);
 }
+const routeSeen = [];
 function route(n, v) {
   n = n | 0;
   if (n < 1 || n > 3) { sidlog("filter", "route: osc outside 1..3", n); return; }
+  const bit = 1 << (n - 1);
+  if (!routeSeen[n]) { routeSeen[n] = true; fields.filterRouting = v ? fields.filterRouting | bit : fields.filterRouting & ~bit; return; }   // restored on load: not sent (see param)
   setBit("filterRouting", n - 1, !!v);
 }
 const nameChars = [];                                   // 1..10 -> ASCII; also sent by sendall
 function namechar(i, code) {
   i = i | 0; code = code | 0;
   if (i < 1 || i > SidParams.NAME_LEN || code < 0 || code > 127) { sidlog("filter", "namechar out of range", i, code); return; }
+  const first = nameChars[i - 1] === undefined;
   nameChars[i - 1] = code;
-  if (muted()) return;
+  if (first || muted()) return;                         // the first is restored by Live on load (see param)
   try { tx(encodeDP(i - 1, 0x7f, 0, code)); }
   catch (e) { sidlog("filter", "DP error namechar", i, "=", code, ":", e.message); }
 }
@@ -71,7 +75,15 @@ function param(key, v) {
   v = Math.round(Number(v));
   if (!Number.isFinite(v)) { sidlog("filter", "invalid value", key, v); return; }
   v = Math.max(d.min, Math.min(d.max, v));
+  const first = !(key in val);
   val[key] = v;
+  // The first value of a parameter is what Live restores when the device loads: it is the starting point and never goes
+  // to the synth, whenever it arrives (once it came after "armed" and 155 values overwrote the synth's edit buffer).
+  if (first) {
+    if (d.field) fields[d.field] = d.values ? d.values[v] : v === 1 ? fields[d.field] | (1 << d.bit) : fields[d.field] & ~(1 << d.bit);
+    if (armed) sidlog("filter", "first value kept, not sent:", key, v);
+    return;
+  }
   if (d.field) { if (d.values) setField(d.field, d.values[v]); else setBit(d.field, d.bit, v === 1); return; }
   if (muted()) return;
   sendParam(d, v);

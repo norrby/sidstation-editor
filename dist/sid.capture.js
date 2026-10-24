@@ -334,7 +334,7 @@ function reply(frame) {
   if (!r.ok) { sidlog("capture", "reply ignored:", r.reason); return; }
   if (r.id === ID_SETTINGS_REPLY) {
     sidlog("capture", "settings: source " + ["Patch", "Globl", "ExtCl"][r.source] + ", global speed " + r.globalSpeed + " Hz, patch speed " +
-      r.patchSpeed + " Hz, period " + r.period + " -> " + r.rateHz.toFixed(1) + " Hz, slot " + r.slot + ", base ch " + (r.baseCh + 1));
+      r.patchSpeed + " Hz, period " + r.period + " -> " + r.rateHz.toFixed(1) + " Hz, slot " + r.slot + " (loaded " + r.loaded + "), base ch " + (r.baseCh + 1));
     outlet(0, "settings", Math.round(r.rateHz * 10) / 10, r.source, r.slot, r.globalSpeed, r.patchSpeed, r.baseCh, r.lock);
     outlet(0, "replied", "settings");
   } else {

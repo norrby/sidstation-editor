@@ -13,7 +13,11 @@ function loadFilter() {
   const g = { UI, sidlog, sidguard, SidParams, encodeDP, inlets: 0, outlets: 0, post() {}, outlet: (o, msg, ...a) => { if (msg === "frame") out.push(a); }, arrayfromargs: (a) => Array.from(a), messagename: "x",
     Task: class { constructor(fn) { this.fn = fn; } schedule() {} cancel() {} } };
   const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.filter.js"), "utf8").replace(/^inlets = 1;\noutlets = 2;\n/m, "");
-  return { f: new Function(...Object.keys(g), src + "\nreturn { route, arm, sendall, quiet, msg: (n, v) => { messagename = n; anything(v); } };")(...Object.values(g)), out };
+  const f = new Function(...Object.keys(g), src + "\nreturn { route, arm, sendall, quiet, msg: (n, v) => { messagename = n; anything(v); } };")(...Object.values(g));
+  for (const d of SidParams.FILTER.concat(SidParams.COMMON)) f.msg(d.key, d.init);   // Live's restore on load: the starting point
+  for (let n = 1; n <= 3; n++) f.route(n, 1);
+  out.length = 0;
+  return { f, out };
 }
 function loadUi(file, size, extra) {
   const out = [];
@@ -45,7 +49,8 @@ test("filter router: nothing before arm; routing and type as fields; CC for cuto
   assert.deepEqual(out.splice(0), []);
   f.quiet(-1); f.msg("res", 3); assert.deepEqual(out.splice(0), [encodeDP(0x18, 0x0f, 4, 3)]);
   f.sendall();
-  assert.equal(out.length, 5); assert.ok(out.some((m) => m[1] === 27));            // cutoff, res, wrap + the routing and type fields
+  const plain = SidParams.FILTER.concat(SidParams.COMMON).filter((d) => !d.field).length;
+  assert.equal(out.length, plain + 2); assert.ok(out.some((m) => m[1] === 27));    // every plain parameter + the routing and type fields
   for (const row of ["24:7:0", "25:7:0", "24:15:4", "25:3:4", "26:127:0", "22:1:6"]) assert.ok(SidParams.dpRows().has(row), row);
 });
 

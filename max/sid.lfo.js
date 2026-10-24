@@ -40,7 +40,11 @@ function lfo(n, key, v) {
   v = Math.round(Number(v));
   if (!Number.isFinite(v)) { sidlog("lfo", "invalid value", key, v); return; }
   v = Math.max(d.min, Math.min(d.max, v));
+  const first = !(key in val[n - 1]);
   val[n - 1][key] = v;
+  // The first value of a parameter is what Live restores when the device loads: it is the starting point and never goes
+  // to the synth, whenever it arrives (once it came after "armed" and 155 values overwrote the synth's edit buffer).
+  if (first) { if (armed) sidlog("lfo", "first value kept, not sent:", n, key, v); return; }
   if (muted()) return;
   sendParam(n, d, v);
 }

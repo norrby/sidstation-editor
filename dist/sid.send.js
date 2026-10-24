@@ -637,7 +637,11 @@ function store() { if (accept(encodeStore(), "store")) status("store queued (cur
 // DP traffic). SysEx bytes are never let through on this path.
 const midiIn = midiParser({                                          // lib/midi.js
   realtime: (b) => outlet(0, b),
-  channel: (m) => { for (const x of m) outlet(0, x); },
+  channel: (m) => {
+    // A program change from the track's input selects a slot on the synth (its name then blinks until ENTER): logged, so it can be told apart from the editor
+    if ((m[0] & 0xf0) === 0xc0) sidlog("send", "track input: program change", m[1], "on channel", (m[0] & 0x0f) + 1);
+    for (const x of m) outlet(0, x);
+  },
   sysex: () => sidlog("send", "REFUSED SysEx on the note path"),
   broken: () => sidlog("send", "REFUSED SysEx on the note path"),
 });

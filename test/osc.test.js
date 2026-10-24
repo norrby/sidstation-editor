@@ -17,6 +17,8 @@ function loadRouter(oscNo, armed = true) {
   const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.osc.js"), "utf8").replace(/^inlets = 1;\noutlets = 3;\n/m, "");
   const fn = new Function(...Object.keys(g), src + "\nreturn { msg_int, param, sendall, arm, msg: (n, ...a) => { const fns = { trackmode, tracknote, sendall, arm, channel, quiet }; if (fns[n]) return fns[n](...a); messagename = n; anything(...a); } };");   // v8 calls named functions before anything
   const r = fn.call({}, ...Object.values(g));
+  for (const d of SidParams.OSC) r.param(d.key, d.init);                   // Live restores every parameter on load: the starting point
+  out.length = 0;
   if (armed) r.arm();
   return { r, out };
 }
@@ -57,8 +59,8 @@ test("osc 2 uses 50.. and 70/71, sendall resends everything", () => {
   r.msg("release", 4);     assert.deepEqual(bus(out.splice(0)), [0xb0, 71, Math.round(4 * 127 / 15)]);
   r.msg("active", 0);      assert.deepEqual(bus(out.splice(0)), [0xb0, 25, 0]);
   r.sendall();
-  const b = bus(out.splice(0));
-  assert.equal(b.length, 9);
+  const b = bus(out.splice(0)).join(" ");
+  for (const cc of [[0xb0, 70, 127], [0xb0, 71, Math.round(4 * 127 / 15)], [0xb0, 25, 0]]) assert.ok(b.includes(cc.join(" ")), "sendall includes " + cc);
 });
 
 test("parameters without CC go as Direct Program with the right address and code", () => {
@@ -87,9 +89,9 @@ test("before the device is loaded (arm) nothing is sent; the values are kept and
   r.msg("transpose", 5);
   assert.deepEqual(bus(out.splice(0)), [0xb0, 36, Math.round(29 * 127 / 48)]);
   r.sendall();
-  const b = bus(out.splice(0));
-  assert.equal(b.filter((x) => x === 0xb0).length, 2);      // active + transpose via CC
-  assert.equal(b.filter((x) => x === 0xf0).length, 1);      // wave via DP
+  const b = bus(out.splice(0)).join(" ");
+  assert.ok(b.includes([0xb0, 24, 0].join(" ")), "active kept from before arm");
+  assert.ok(b.includes([0xb0, 36, Math.round(29 * 127 / 48)].join(" ")), "transpose");
 });
 
 test("Track in the panel: radio button Key follow | Note + note -> one synth value; 100 goes via DP", () => {
@@ -99,6 +101,23 @@ test("Track in the panel: radio button Key follow | Note + note -> one synth val
   r.msg("tracknote", 99);  assert.deepEqual(bus(out.splice(0)), [0xb0, 35, 127]);
   r.msg("tracknote", 100); assert.deepEqual(bus(out.splice(0)).slice(7, 12), [0x00, 0x48, 0x7f, 0x00, 100]);
   r.msg("trackmode", 0);   assert.deepEqual(bus(out.splice(0)), [0xb0, 35, 0]);
+});
+
+test("the first value of a parameter (Live restoring it on load) is never sent, even after arm", () => {
+  const out = [];
+  const g = { midiParser, sidlog, sidguard, SidParams, encodeDP, inlets: 0, outlets: 0, jsarguments: ["sid.osc.js", 1], post() {},
+    outlet: (o, ...a) => out.push(a[0] === "frame" ? ["gw", ...a] : [o, ...a]), arrayfromargs: (a) => Array.from(a), messagename: "x",
+    Task: class { constructor(fn) { this.fn = fn; } schedule() {} cancel() {} } };
+  const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.osc.js"), "utf8").replace(/^inlets = 1;\noutlets = 3;\n/m, "");
+  const r = new Function(...Object.keys(g), src + "\nreturn { param, arm, sendall };").call({}, ...Object.values(g));
+  r.arm();                                                                 // "armed" before the restore (seen with a frozen device)
+  for (const d of SidParams.OSC) r.param(d.key, d.init);
+  assert.deepEqual(bus(out), [], "the restore goes nowhere");
+  r.param("wave", 1);
+  assert.ok(bus(out).length > 0, "a change after that is sent");
+  out.length = 0;
+  r.sendall();
+  assert.ok(bus(out).length > 0, "Push patch sends everything");
 });
 
 test("wave gives ringok on outlet 1: 1 for Tri and Mixed, 0 for others, even unarmed", () => {
