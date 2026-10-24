@@ -5,6 +5,8 @@ Every sound parameter of a patch is on screen and automatable in Ableton Live: t
 with envelopes, pulse width and wave tables, the filter with its envelope, four LFOs, and the
 patch-wide settings.
 
+![SidStation Editor in Ableton Live](docs/images/device.png)
+
 Not affiliated with or endorsed by Elektron. Use at your own risk.
 
 ## Features
@@ -28,6 +30,12 @@ Not affiliated with or endorsed by Elektron. Use at your own risk.
   store support (see below). With the stock OS the synth does not answer, and the editor shows
   **NO REPLY**.
 - Every value is a Live parameter: automation, MIDI mapping and presets work as usual.
+
+<img src="docs/images/oscillator.png" alt="Overview and oscillator 1 with pulse width" width="785">
+
+<img src="docs/images/filter.png" alt="Filter with its envelope: the response shows cutoff, envelope depth and sustain" width="679">
+
+<img src="docs/images/lfo.png" alt="LFO 2 with fade-in, LFO 3 added" width="525">
 
 ## Requirements
 
@@ -93,8 +101,9 @@ Max cannot create folders, so these are used only if you create them:
 ## Firmware
 
 Pull, Store and the settings request use SysEx messages (ids 05, 06 and 07) that the stock
-SidStation OS does not know; they need a modified firmware. Everything else works with the stock
-OS 1.10.
+SidStation OS does not know; they need OS 1.12 R01, a patch for OS 1.10 R33:
+[sidstation-firmware](https://github.com/norrby/sidstation-firmware). Everything else works with
+the stock OS 1.10.
 
 ## Command line
 
