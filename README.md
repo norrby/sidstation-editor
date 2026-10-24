@@ -33,11 +33,20 @@ Not affiliated with or endorsed by Elektron. Use at your own risk.
 
 ## Install
 
-1. Download or clone this repository.
+1. Download `SidStation-<version>.amxd` from the latest release on the
+   [Releases](https://github.com/norrby/sidstation-editor/releases) page. It is a single frozen file:
+   the scripts and icons are inside.
+2. Put it in your User Library, for example `User Library/Presets/MIDI Effects/Max MIDI Effect/`, or
+   drag it straight from the download folder.
+3. Drag **SidStation** onto a MIDI track.
+
+### From source
+
+1. Clone this repository.
 2. In Live's browser, **Places → Add Folder…** and pick the `dist/` folder.
 3. Drag **SidStation** onto a MIDI track.
 
-The devices load their scripts from `dist/`, so keep the folder where it is (or rebuild after
+These devices load their scripts from `dist/`, so keep the folder where it is (or rebuild after
 moving it).
 
 ## Setup in Live
