@@ -43,7 +43,11 @@ Not affiliated with or endorsed by Elektron. Use at your own risk.
 ## Requirements
 
 - Ableton Live 12 with Max for Live (Max 9, the `v8` objects).
-- A SidStation with OS 1.10 (R33). Other versions are untested.
+- A SidStation. Pull, Store and the settings request need OS 1.12 R01
+  ([sidstation-firmware](https://github.com/norrby/sidstation-firmware)); everything else uses only
+  what the manual describes and has been tested with OS 1.10 R33.
+- **Not OS 1.11 R34:** its direct-parameter receiver is broken and writes outside the edit buffer,
+  which can damage stored patches.
 - A MIDI interface connected both ways to the synth (MIDI Out → synth In, synth Out → MIDI In).
 
 ## Install
