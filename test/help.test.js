@@ -1,13 +1,14 @@
 // node --test: every control on SidStation's panel has a help text for Live's Info View (lib/help.js); only frames and
 // section headings go without.
 const test = require("node:test");
+const NAME = require("../package.json").productName;   // the device's name
 const assert = require("node:assert/strict");
 const path = require("path");
 const { readAmxd } = require("../build/amxd");
 const { help } = require("../lib/help");
 
 test("SidStation: every presented control has annotation_name and annotation", () => {
-  const p = readAmxd(path.join(__dirname, "..", "dist", "SidStation.amxd")).json.patcher;
+  const p = readAmxd(path.join(__dirname, "..", "dist", NAME + ".amxd")).json.patcher;
   const silent = (b) => b.filename === "sid.voicebg.js" || b.filename === "sid.section.js";
   const missing = p.boxes.map((x) => x.box)
     .filter((b) => b.presentation && /^live\.|^v8ui$|^textedit$/.test(b.maxclass) && !silent(b))

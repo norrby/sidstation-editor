@@ -2,6 +2,7 @@
 // manual p. 43), the DP rows are whitelisted, sid.load.js fills the table widgets from a dump, and the layout with a
 // table panel expanded has no overlaps.
 const test = require("node:test");
+const NAME = require("../package.json").productName;   // the device's name
 const assert = require("node:assert/strict");
 const { midiParser } = require("../lib/midi");
 const fs = require("fs");
@@ -65,7 +66,7 @@ test("sid.load.js sends every table to o<n>_table, an unterminated one as all 65
 
 test("SidStation layout: every table panel expanded fits, nothing overlaps", () => {
   const src = fs.readFileSync(path.join(__dirname, "..", "dist", "sid.layout.js"), "utf8");
-  const layout = JSON.parse(src.match(/const LAYOUTS = (.*);\n/)[1]).SidStation;
+  const layout = JSON.parse(src.match(/const LAYOUTS = (.*);\n/)[1])[NAME];
   const st = L.initialState(layout);
   const hidden = L.compute(layout, st).ops.filter((o) => /_table$/.test(o.name));
   assert.ok(hidden.length === 3 && hidden.every((o) => o.rect === null), "collapsed by default");

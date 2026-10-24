@@ -107,14 +107,14 @@ function apply(i, code, silent) {
   return true;
 }
 function syncEdit() { outlet(1, "set", text().replace(/\s+$/, "")); }      // textedit follows along (silently)
-// The device takes the patch name as its own name, so Push shows it in its header (an empty name gives "SidStation"). Set once,
+// The device takes the patch name as its own name, so Push shows it in its header (an empty name gives the device's own name, DEVICE_NAME from the build). Set once,
 // 300 ms after the last change: a dump sets ten characters one by one, and every rename is a step in Live's undo history.
 let renameTask = null;
 function renameDevice() {
   if (typeof LiveAPI === "undefined" || typeof Task === "undefined") return;     // not in Max (tests)
   if (!renameTask) renameTask = new Task(() => {
     try {
-      const dev = new LiveAPI("this_device"), want = text().trim() || "SidStation";
+      const dev = new LiveAPI("this_device"), want = text().trim() || DEVICE_NAME;
       if (String(dev.get("name")) !== want) { dev.set("name", want); sidlog("name", "device name", JSON.stringify(want)); }
     } catch (e) { sidlog("name", "cannot rename the device", e.message); }
   });

@@ -15,7 +15,7 @@
 inlets = 1;
 outlets = 2;
 
-const devname = jsarguments.length > 1 ? String(jsarguments[1]) : "SidStation";
+const devname = jsarguments.slice(1).join(" ");      // the device name, from the build (a name with spaces comes as several arguments)
 const layout = LAYOUTS[devname];
 const state = layout ? initialState(layout) : {};
 let prev = null;

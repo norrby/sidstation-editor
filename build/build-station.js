@@ -1,10 +1,10 @@
-// build-station.js – dist/SidStation.amxd, the editor: [overview after the SID datasheet (sid.map.js): three voices
+// build-station.js – dist/<productName>.amxd, the editor: [overview after the SID datasheet (sid.map.js): three voices
 //   Osc -> Env -> switch -> Filter/out, sync/ring arrows, the patch name and the patch column] [voice 1..3: a column (number,
 //   fold buttons osc/env/tbl, Active/Sync/Ring/Filter) and three sub-panels: oscillator (Waveform + Tone), Envelope, Table]
 //   [filter + filter envelope] [LFO 1–4, one at a time]. Every voice's width follows what is expanded.
 // Panels in Live's style (light filled area, no outlines); sub-panels slightly darker. npm run build.
 //
-// Every x is derived from PAD/GAP. At runtime all presentation rects are owned by [v8 sid.layout.js SidStation] (lib/layout.js),
+// Every x is derived from PAD/GAP. At runtime all presentation rects are owned by [v8 sid.layout.js <device name>] (lib/layout.js),
 // which hides the pulse group, collapses panels and sets the device width (setwidth).
 //
 // Every Live parameter is a live.* object (automation, storage, mapping). The widgets (ADSR, pulse, note picker, table …)
@@ -30,6 +30,9 @@ const { parameters } = require("./station/banks");
 
 // The device: the overview, voices 1–3, the filter, LFO 1–4, and the one-track plumbing (gateway, capture).
 const OSCS = [1, 2, 3];
+// The device's name (package.json productName): its file name in Live's browser, its name in the track when no patch name is
+// set (sid.name.js, DEVICE_NAME), the layout's key, the release file.
+const DEVICE = require("../package.json").productName;
 function buildDevice(title) {
   const json = A.midiEffectSkeleton(title, 100);
   const p = json.patcher;
@@ -178,10 +181,12 @@ function buildDevice(title) {
 fs.mkdirSync(OUT_DIR, { recursive: true });
 const LAYOUTS = {};
 {
-  const { json, layout, width } = buildDevice("SidStation");
-  LAYOUTS.SidStation = layout;
-  A.writeAmxd(path.join(OUT_DIR, "SidStation.amxd"), json);
-  console.log("wrote dist/SidStation.amxd (" + width + " px)");
+  const { json, layout, width } = buildDevice(DEVICE);
+  // Live's Info View for the device itself (empty, Live showed a generic "MIDI Effect" text)
+  json.patcher.description = "Editor for the Elektron SidStation: every patch parameter as a Live parameter, with Pull, Push and Store patch. Not affiliated with Elektron.";
+  LAYOUTS[DEVICE] = layout;
+  A.writeAmxd(path.join(OUT_DIR, DEVICE + ".amxd"), json);
+  console.log("wrote dist/" + DEVICE + ".amxd (" + width + " px)");
 }
 const read = (f) => fs.readFileSync(path.join(__dirname, "..", f), "utf8");
 writeIfChanged(path.join(OUT_DIR, "sid.osc.js"), ["lib/maxlog.js", "lib/sysex.js", "lib/params.js", "lib/midi.js", "max/sid.osc.js"].map(read).join("\n\n"));
@@ -191,6 +196,6 @@ writeIfChanged(path.join(OUT_DIR, "sid.send.js"), ["lib/maxlog.js", "lib/sysex.j
 writeIfChanged(path.join(OUT_DIR, "sid.capture.js"), ["lib/maxlog.js", "lib/sysex.js", "lib/midi.js", "max/sid.capture.js"].map(read).join("\n\n"));               // the capture
 writeIfChanged(path.join(OUT_DIR, "sid.load.js"), ["lib/maxlog.js", "lib/params.js", "max/sid.load.js"].map(read).join("\n\n"));
 writeIfChanged(path.join(OUT_DIR, "sid.layout.js"), [read("lib/maxlog.js"), read("lib/layout.js"), "const LAYOUTS = " + JSON.stringify(LAYOUTS) + ";\n", read("max/sid.layout.js")].join("\n\n"));
-for (const f of ["sid.adsr.js", "sid.pulse.js", "sid.note.js", "sid.map.js", "sid.fold.js", "sid.section.js", "sid.filtcurve.js", "sid.legend.js", "sid.vslider.js", "sid.name.js", "sid.lfoview.js", "sid.table.js", "sid.voicebg.js", "sid.lfotabs.js", "sid.loopbtn.js", "sid.litbtn.js", "sid.activebtn.js", "sid.dimbtn.js"]) writeIfChanged(path.join(OUT_DIR, f), ["lib/maxlog.js", "lib/ui.js", "max/" + f].map(read).join("\n\n"));   // + the shared palette
+for (const f of ["sid.adsr.js", "sid.pulse.js", "sid.note.js", "sid.map.js", "sid.fold.js", "sid.section.js", "sid.filtcurve.js", "sid.legend.js", "sid.vslider.js", "sid.name.js", "sid.lfoview.js", "sid.table.js", "sid.voicebg.js", "sid.lfotabs.js", "sid.loopbtn.js", "sid.litbtn.js", "sid.activebtn.js", "sid.dimbtn.js"]) writeIfChanged(path.join(OUT_DIR, f), ["lib/maxlog.js", "lib/ui.js", "max/" + f].map(read).join("\n\n").replace("\n\n// sid.name.js", "\n\nconst DEVICE_NAME = " + JSON.stringify(DEVICE) + ";\n\n// sid.name.js"));   // + the shared palette (and the device name for sid.name.js)
 for (const f of fs.readdirSync(path.join(__dirname, "..", "max", "icons"))) copyIfChanged(path.join(__dirname, "..", "max", "icons", f), path.join(OUT_DIR, f));
 console.log("wrote dist/sid.osc.js, sid.layout.js, widgets, icons");

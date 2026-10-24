@@ -1,5 +1,6 @@
 // node --test: sid.filter.js (the routing field), the overview sid.map.js, the legend, the depth slider.
 const test = require("node:test");
+const NAME = require("../package.json").productName;   // the device's name
 const assert = require("node:assert/strict");
 const { UI } = require("../lib/ui");
 const fs = require("fs");
@@ -114,7 +115,7 @@ test("the filter router sends Poly/Legato/HCut as whitelisted DP (the common blo
 });
 
 test("SidStation: Poly greys the Active buttons (== 0 -> prepend active -> o<n>_active and osc 3's Mod only button)", () => {
-  const p = require("../build/amxd").readAmxd(require("path").join(__dirname, "..", "dist", "SidStation.amxd")).json.patcher;
+  const p = require("../build/amxd").readAmxd(require("path").join(__dirname, "..", "dist", NAME + ".amxd")).json.patcher;
   const byVn = (v) => p.boxes.find((b) => b.box.varname === v).box.id;
   const from = (src) => p.lines.filter((l) => l.patchline.source[0] === src).map((l) => l.patchline.destination[0]);
   const text = (bid) => p.boxes.find((b) => b.box.id === bid).box.text;
@@ -139,7 +140,7 @@ test("overview: a voice not heard is grey – Active off, or osc 2/3 in Poly (os
 test("SidStation layout: Poly swaps osc 1's Active for the always-on stand-in", () => {
   const L = require("../lib/layout");
   const src = fs.readFileSync(path.join(__dirname, "..", "dist", "sid.layout.js"), "utf8");
-  const lay = JSON.parse(src.split("const LAYOUTS = ")[1].split(";\n")[0]).SidStation;
+  const lay = JSON.parse(src.split("const LAYOUTS = ")[1].split(";\n")[0])[NAME];
   const rectOf = (st, name) => L.compute(lay, st).ops.find((o) => o.name === name).rect;
   const st = L.initialState(lay);
   assert.ok(rectOf(st, "o1_active") && !rectOf(st, "o1_activepoly"));
@@ -149,14 +150,14 @@ test("SidStation layout: Poly swaps osc 1's Active for the always-on stand-in", 
 });
 
 test("SidStation: osc 1's Poly stand-in is sid.litbtn.js (always lit), placed where Active is", () => {
-  const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", "SidStation.amxd")).json.patcher;
+  const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", NAME + ".amxd")).json.patcher;
   const vn = (v) => p.boxes.find((b) => b.box.varname === v).box;
   assert.equal(vn("o1_activepoly").filename, "sid.litbtn.js");
   assert.deepEqual(vn("o1_activepoly").presentation_rect, vn("o1_active").presentation_rect);
 });
 
 test("SidStation (one track): no global bus; midiout is fed only by the built-in gateway; every router and the notes go to it", () => {
-  const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", "SidStation.amxd")).json.patcher;
+  const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", NAME + ".amxd")).json.patcher;
   const boxes = p.boxes.map((b) => b.box), text = (b) => b.text || "";
   assert.deepEqual(boxes.filter((b) => /^(s|r|send|receive) sid\.(tx|rx)\b/.test(text(b))).map(text), [], "no [s/r sid.tx/rx]");
   const id = (re) => boxes.filter((b) => re.test(text(b))).map((b) => b.id);
@@ -176,7 +177,7 @@ test("SidStation (one track): no global bus; midiout is fed only by the built-in
 });
 
 test("SidStation: Push banks of 8 by long name; no show/hide tabs, table data, name letters or patch buttons", () => {
-  const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", "SidStation.amxd")).json.patcher;
+  const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", NAME + ".amxd")).json.patcher;
   const banks = Object.values(p.parameters.parameterbanks);
   assert.equal(banks.length, 21);
   assert.deepEqual(banks.map((b) => b.index), banks.map((_, i) => i));
@@ -192,7 +193,7 @@ test("SidStation: Push banks of 8 by long name; no show/hide tabs, table data, n
 });
 
 test("SidStation: every live.text shows its parameter's values in Live and on Push (automation/automationon), never val1/val2", () => {
-  const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", "SidStation.amxd")).json.patcher;
+  const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", NAME + ".amxd")).json.patcher;
   for (const { box: b } of p.boxes.filter((x) => x.box.maxclass === "live.text")) {
     const e = b.saved_attribute_attributes.valueof.parameter_enum;
     assert.deepEqual([b.automation, b.automationon], e, b.varname);

@@ -3,6 +3,7 @@
 // are 46 px apart but 48 px tall, headings and brackets touch by design.
 // The name display deliberately sits on top of the overview.
 const test = require("node:test");
+const NAME = require("../package.json").productName;   // the device's name
 const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
@@ -27,7 +28,7 @@ function problems(layout, state) {
 }
 
 test("SidStation: no overlapping controls, initial state and LFO 1–4", () => {
-  const layout = LAYOUTS.SidStation;
+  const layout = LAYOUTS[NAME];
   const st = L.initialState(layout);
   assert.deepEqual(problems(layout, st), []);
   for (let k = 1; k <= 4; k++) { L.selectLfo(st, k); assert.deepEqual(problems(layout, st), [], "LFO " + k); }
