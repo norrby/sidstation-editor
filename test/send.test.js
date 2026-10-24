@@ -14,7 +14,7 @@ function loadGateway() {
   const g = { midiParser, sidlog, sidguard, ...S, SidParams, Task, File: class {}, inlets: 0, outlets: 0, post() {}, arrayfromargs: (a) => Array.from(a), messagename: "x",
     outlet: (o, ...a) => { if (o === 0) out.push(a[0]); else if (a[0] === "status") status.push(a[1]); } };
   const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.send.js"), "utf8").replace(/^inlets = 1;\noutlets = 2;\n/m, "");
-  const fn = new Function(...Object.keys(g), src + "\nreturn { cc, note, pc, dp, frame, stop, send, msg_int, get queue() { return queue; } };");
+  const fn = new Function(...Object.keys(g), src + "\nreturn { cc, note, pc, dp, frame, stop, send, msg_int, store, stored, get queue() { return queue; } };");
   const run = () => { while (sched.length) { const [t] = sched.shift(); if (!t.cancelled) t.fn(); } };   // drain all ticks
   return { w: fn(...Object.values(g)), out, status, sched, run };
 }
@@ -64,4 +64,23 @@ test("the note path (one track): channel messages go out at once, outside the qu
   w.msg_int(0xf8);                                                         // realtime in the middle passes
   w.msg_int(100);
   assert.deepEqual(out.splice(0), [0xf8, 0xb0, 7, 100]);
+});
+
+test("the track's notes are held while the synth stores and go out in order after the reply (or the timeout)", () => {
+  const { w, out, sched, run } = loadGateway();
+  const STORE = S.encodeStore();
+  w.store();
+  assert.deepEqual(out.splice(0), STORE, "the store goes out");
+  for (const b of [0x90, 60, 100, 0xf8, 0x80, 60, 0]) w.msg_int(b);      // note on, clock, note off during the store
+  assert.deepEqual(out, [], "nothing to the synth while it stores");
+  w.stored(0, 5, 146, 1234, 4000);
+  assert.deepEqual(out.splice(0), [0x90, 60, 100, 0xf8, 0x80, 60, 0], "held, in order, note-off included");
+  w.msg_int(0x90); w.msg_int(62); w.msg_int(100);
+  assert.deepEqual(out.splice(0), [0x90, 62, 100], "after the store: at once again");
+  w.store(); out.length = 0;
+  w.msg_int(0x90); w.msg_int(64); w.msg_int(100);
+  const lock = sched.find(([t, ms]) => ms === 3000)[0];
+  lock.fn();                                                               // no reply: the timeout also lets them out
+  assert.deepEqual(out.splice(0), [0x90, 64, 100]);
+  run();
 });

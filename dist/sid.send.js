@@ -450,8 +450,8 @@ if (typeof module !== "undefined" && module.exports) module.exports = { midiPars
 //     outlet of their own (no global bus, so nothing else in the set can send through it twice).
 //  3. Store: from sending 07 until its 47 reply (from the capture: "stored") or a timeout NOTHING else goes to
 //     the synth. The store compacts the patch memory for up to ~0.3 s; a patch frame (02/01) in that window corrupts the
-//     whole patch memory. Queued messages wait; a second store is refused.
-//  The track's notes come in as bytes (msg_int) and go out at once, outside the queue. A frame is always output whole in
+//     whole patch memory. Queued messages wait, the track's notes are held; a second store is refused.
+//  The track's notes come in as bytes (msg_int) and go out at once, outside the queue (held during a store). A frame is always output whole in
 //  one call, so a note can never land inside it.
 //
 // [v8 sid.send.js] outlet 0 -> [midiout]. Outlet 1: "status <text>",
@@ -527,13 +527,27 @@ function validate(m) {
 }
 
 function lockStore() {
-  storing = new Task(() => { storing = null; noReply("store", "store: NO REPLY within " + STORE_TIMEOUT_MS + " ms – the patch may or may not have been stored"); });
+  storing = new Task(() => { unlockStore(); noReply("store", "store: NO REPLY within " + STORE_TIMEOUT_MS + " ms – the patch may or may not have been stored"); });
   storing.schedule(STORE_TIMEOUT_MS);
   status("store sent, waiting for the reply");
 }
+// The track's notes are held while the synth stores (it compacts its patch memory) and go out in order afterwards: held, not
+// dropped, so no note-off is lost and no note hangs. At most HELD_MAX messages; more is dropped and logged.
+const held = [], HELD_MAX = 256;
+let heldDropped = 0;
+function unlockStore() {
+  storing = null;
+  if (held.length || heldDropped) sidlog("send", "store done: " + held.length + " held messages out" + (heldDropped ? ", " + heldDropped + " dropped" : ""));
+  for (const m of held.splice(0)) for (const x of m) outlet(0, x);
+  heldDropped = 0;
+}
+function play(m) {
+  if (!storing) { for (const x of m) outlet(0, x); return; }
+  if (held.length < HELD_MAX) held.push(m); else heldDropped++;
+}
 function stored(st, slot, size, sum, free) {
   if (!storing) { sidlog("send", "store reply without a pending store"); return; }
-  storing.cancel(); storing = null;
+  storing.cancel(); unlockStore();
   outlet(1, "answered", "store");
   status("store reply: " + (STORE_STATUS[st] || "status " + st) + ", slot " + slot + ", " + size + " bytes, " + free + " free");
 }
@@ -634,13 +648,13 @@ function settings() { if (accept(encodeSettingsRequest(), "settings")) status("s
 function store() { if (accept(encodeStore(), "store")) status("store queued (current slot)"); }
 // The track's notes (built into SidStation): bytes from the osc 1 router, which already drops SysEx and passes whole channel
 // messages. Collected again here and checked like any channel message, then output at once (notes must not wait behind
-// DP traffic). SysEx bytes are never let through on this path.
+// DP traffic), except during a store (see play). SysEx bytes are never let through on this path.
 const midiIn = midiParser({                                          // lib/midi.js
-  realtime: (b) => outlet(0, b),
+  realtime: (b) => play([b]),
   channel: (m) => {
     // A program change from the track's input selects a slot on the synth (its name then blinks until ENTER): logged, so it can be told apart from the editor
     if ((m[0] & 0xf0) === 0xc0) sidlog("send", "track input: program change", m[1], "on channel", (m[0] & 0x0f) + 1);
-    for (const x of m) outlet(0, x);
+    play(m);
   },
   sysex: () => sidlog("send", "REFUSED SysEx on the note path"),
   broken: () => sidlog("send", "REFUSED SysEx on the note path"),
