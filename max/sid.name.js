@@ -8,6 +8,7 @@
 // (very slow and unreliable). Upper case, lower case, digits and common characters; unknown ones are drawn as "?".
 // In:  typed <text>         from textedit on Return: sets, sends changed characters, hides the field
 //      cancel               Esc in the field: hides it without sending
+//      outside              from the gateway: another control sent something -> the open field is accepted
 //      set char <i> <code>  silent (from the Name parameters; echoes are ignored)     set name <word…>   silent, padded
 //      bang                 output all ten
 //      noreply <what>       from the gateway: a request got no answer -> NO REPLY in red until "answered" (any reply) or a click
@@ -124,6 +125,7 @@ function renameDevice() {
 // being shown. While typing the display is hidden (presentation 0) and the field shown in its place: otherwise the field lay under the
 // display's v8ui (the layout's bringtofront name) and received the keys invisibly. The rect is kept for restoring.
 let shownRect = null;
+let quiet = false;         // accepting because another control was used: an unchanged name is not sent again
 function currentRect() {
   try {
     const r = this.patcher.getnamed("name").getattr("presentation_rect");
@@ -143,6 +145,7 @@ function report(box) {
 }
 function showEdit(on) {
   if (on) {
+    quiet = false;
     shownRect = currentRect.call(this);
     if (!shownRect) return;                                                  // unknown position: hide nothing
     sidlog("name", "editing at", shownRect.join(" "));
@@ -166,6 +169,8 @@ function typed() {
   // 7-bit ASCII becomes "?" – the synth only takes 0..127 per character (an o with umlaut once went out as 7f). At most ten characters.
   const s = raw.replace(/\t/g, "").replace(/[\r\n]+/g, " ").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\x20-\x7e]/g, "?").slice(0, N);
   sidlog("name", "typed", JSON.stringify(raw));
+  if (quiet && s === text().replace(/\s+$/, "")) { quiet = false; showEdit(false); return; }
+  quiet = false;
   // Return sends the whole name, all ten characters – the synth may hold a different name than the editor thinks, so the changed characters alone are not enough.
   for (let i = 0; i < N; i++) apply(i, i < s.length ? s.charCodeAt(i) : 32, true);
   bang();
@@ -185,10 +190,14 @@ function set() {
 }
 // Esc in the field (textedit outlet 1, key 27): close without sending, the field goes back to the current name.
 function cancel() { if (!shownRect) return; sidlog("name", "editing cancelled"); syncEdit(); showEdit(false); }
+// Another control sent something to the synth while the field was open. textedit says nothing when it loses focus
+// with its text unchanged, so the field stayed open (after a click on Poly). The bang makes it output its text, as Tab does:
+// what was typed is kept, an unchanged name just closes the field.
+function outside() { if (!shownRect) return; sidlog("name", "closed by another control"); quiet = true; outlet(1, "bang"); }
 function bang() { for (let i = 0; i < N; i++) outlet(0, "namechar", i + 1, codes[i]); }
 function text() { return codes.map((c) => String.fromCharCode(c)).join(""); }   // for tests
 function onresize() { mgraphics.redraw(); }
 function anything() { post("sid.name: unknown message " + messagename + "\n"); }
 
-paint = sidguard("name", paint); typed = sidguard("name", typed); set = sidguard("name", set); onclick = sidguard("name", onclick); cancel = sidguard("name", cancel); noreply = sidguard("name", noreply); answered = sidguard("name", answered);
+paint = sidguard("name", paint); typed = sidguard("name", typed); set = sidguard("name", set); onclick = sidguard("name", onclick); cancel = sidguard("name", cancel); outside = sidguard("name", outside); noreply = sidguard("name", noreply); answered = sidguard("name", answered);
 sidlog("name", "loaded");

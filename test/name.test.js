@@ -15,7 +15,7 @@ function loadWidget() {
   const g = { Task, UI, sidlog, sidguard, mgraphics: mg, inlets: 0, outlets: 0, post() {}, outlet: (o, ...a) => (o === 2 ? scripts : out).push(a.join(" ")), arrayfromargs: (a) => Array.from(a), messagename: "x", Date,
     jsarguments: ["sid.name.js", 4, 127, 144, 30] };
   const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.name.js"), "utf8").replace(/^inlets = 1;\noutlets = 1;\n/m, "").replace("const born = Date.now();", "const born = 0;");
-  const w = new Function(...Object.keys(g), src + "\nreturn { set, bang, text, paint, typed, onclick, noreply, answered, FONT, SET, geom, get warning() { return warning; } };")(...Object.values(g));
+  const w = new Function(...Object.keys(g), src + "\nreturn { set, bang, text, paint, typed, onclick, outside, noreply, answered, FONT, SET, geom, get warning() { return warning; } };")(...Object.values(g));
   w.patcher = { getnamed: (n) => ({ getattr: (a) => (n === "name" && a === "presentation_rect" ? [490, 127, 144, 30] : null) }) };   // the layout engine's position, not the build's
   return { w, out, scripts, tasks };
 }
@@ -93,6 +93,31 @@ test("text from the field after it has closed is ignored (Tab, then focus loss)"
   w.typed("bandy    ");
   assert.deepEqual(out, []);
   assert.equal(w.text(), "bandy     ");
+});
+
+test("another control used while the field is open: the field accepts, an unchanged name closes without sending", () => {
+  const { w, out, scripts } = loadWidget();
+  w.set("name", "FatLead");
+  w.outside();                                                            // field closed: nothing
+  out.splice(0);
+  assert.deepEqual(out, []);
+  w.onclick(10, 10); out.splice(0); scripts.splice(0);
+  w.outside();
+  assert.deepEqual(out.splice(0), ["bang"], "the field is asked for its text, as with Tab");
+  w.typed("FatLead");                                                     // its answer: unchanged
+  assert.deepEqual(out.splice(0), [], "nothing sent");
+  assert.ok(scripts.includes("script sendbox nameedit presentation 0"), "the field is hidden");
+  w.onclick(10, 10); out.splice(0);
+  w.outside(); out.splice(0);
+  w.typed("Bass");                                                        // typed, then clicked elsewhere: kept and sent
+  assert.equal(w.text(), "Bass      ");
+  assert.equal(out.filter((m) => m.startsWith("namechar")).length, 10);
+});
+
+test("the build: the gateway's \"sent\" reaches the name display as \"outside\"", () => {
+  const src = fs.readFileSync(path.join(__dirname, "..", "build", "build-station.js"), "utf8");
+  assert.match(src, /route noreply answered sent/);
+  assert.match(src, /A\.msg\(vSentMsg, "outside"/);
 });
 
 test("noreply shows NO REPLY until a reply comes in, without touching the name; a click or an open field wins", () => {

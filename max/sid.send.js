@@ -29,7 +29,7 @@
 //   stored <status> <slot> <size> <sum> <free>        the 47 reply (from the capture): ends the store lock
 //   replied dump|settings                             a 02/03 dump or a 46 reply came in (from the capture)
 // Every request that expects an answer is timed (Live can lose its input port, and Pull then just does nothing): 05 -> a dump, 06 -> 46, 07 -> 47. No answer within 3 s: a log line and
-// "noreply <dump|settings|store>" on outlet 1 (the name display shows NO REPLY until "answered" – any reply – or a click).
+// "noreply <dump|settings|store>" on outlet 1, and "sent" after every router frame (the name display shows NO REPLY until "answered" – any reply – or a click).
 //   frame <bytes…>  a complete message from a router; validated as above
 
 inlets = 1;
@@ -210,7 +210,9 @@ function msg_int(b) { midiIn(b); }                                   // a declar
 // From a router: "frame <bytes…>", one complete message at a time.
 function frame() {
   const m = arrayfromargs(arguments).map(Number);
-  if (accept(m, "bus")) status("bus: " + (m[0] === 0xf0 ? "DP " + m.slice(7, 12).map((b) => b.toString(16)).join(" ") : m.map((b) => b.toString(16)).join(" ")));
+  if (!accept(m, "bus")) return;
+  status("bus: " + (m[0] === 0xf0 ? "DP " + m.slice(7, 12).map((b) => b.toString(16)).join(" ") : m.map((b) => b.toString(16)).join(" ")));
+  outlet(1, "sent");                                                 // a control was used: the name display closes an open field
 }
 
 const COMMANDS = { load, send, stop, gap, channel, cc, note, pc, dp, request, settings, store, stored, replied, frame };

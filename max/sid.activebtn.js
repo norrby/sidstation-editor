@@ -21,8 +21,15 @@ function paint() {
   UI.button(mgraphics, mgraphics.size[0], mgraphics.size[1], { label: s === "mod" ? "Mod only" : "Active", on: s !== "off", lit: s === "mod" ? UI.line : UI.btnOn, dim: !enabled });
 }
 function onclick() {
-  if (Date.now() - born < 1000 || !enabled) return;
+  if (Date.now() - born < 1000) return;
   const s = state();
+  // In Poly greyed but settable like osc 2's Active, on <-> off only: 3OFF silences SID voice 3, which in Poly plays the third note
+  if (!enabled) {
+    if (s === "on") { active = 0; outlet(0, "active", 0); }
+    else { if (off3) { off3 = 0; outlet(0, "off3", 0); } if (s === "off") { active = 1; outlet(0, "active", 1); } else { active = 0; outlet(0, "active", 0); } }
+    mgraphics.redraw();
+    return;
+  }
   if (s === "on") { off3 = 1; outlet(0, "off3", 1); }
   else if (s === "mod") { off3 = 0; active = 0; outlet(0, "off3", 0); outlet(0, "active", 0); }
   else { active = 1; outlet(0, "active", 1); }

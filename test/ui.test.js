@@ -9,7 +9,6 @@ function mock(measure = (t) => [t.length * 6, 9]) {
   for (const f of ["set_source_rgba", "rectangle", "fill", "stroke", "set_line_width", "select_font_face", "set_font_size", "move_to", "show_text"]) g[f] = (...a) => calls.push([f, ...a]);
   return { g, calls };
 }
-const fade = (c) => [c[0], c[1], c[2], c[3] * 0.4];
 
 test("lit: orange fill, dark border, dark label centred in Ableton Sans 9.5", () => {
   const { g, calls } = mock();
@@ -33,13 +32,13 @@ test("unlit: dark grey fill and a light label; lit takes its colour from o.lit",
   assert.deepEqual(calls[9], ["set_source_rgba", UI.btnEdge]);
 });
 
-test("dim fades fill and label, not the border", () => {
+test("dim draws a disabled live.text: on = grey with a dark label (any lit colour), off = unlit with a grey label; the border stays", () => {
   for (const on of [true, false]) {
     const { g, calls } = mock();
-    UI.button(g, 52, 18, { label: "Active", on, dim: true });
-    assert.deepEqual(calls[0], ["set_source_rgba", fade(on ? UI.btnOn : UI.btnOff)]);
+    UI.button(g, 52, 18, { label: "Active", on, lit: UI.line, dim: true });
+    assert.deepEqual(calls[0], ["set_source_rgba", on ? UI.btnDimOn : UI.btnOff]);
     assert.deepEqual(calls[3], ["set_source_rgba", UI.btnEdge]);
-    assert.deepEqual(calls[9], ["set_source_rgba", fade(on ? UI.btnEdge : UI.text)]);
+    assert.deepEqual(calls[9], ["set_source_rgba", on ? UI.btnDimOnText : UI.btnDimText]);
   }
 });
 

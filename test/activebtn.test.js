@@ -27,10 +27,13 @@ test("a click steps Active -> Mod only -> off -> Active; set is silent", () => {
   w.set("active", 0); assert.equal(w.state(), "off", "inactive wins over 3OFF");
 });
 
-test("in Poly (disabled) a click does nothing", () => {
+test("in Poly (disabled) it is greyed but a click toggles Active on/off like osc 2's, never into Mod only (3OFF mutes voice 3)", () => {
   const { w, out } = load();
   w.setEnabled(0); w.onclick(); w.paint();
-  assert.deepEqual(out, []);
+  assert.deepEqual(out.splice(0), ["active 0"]); assert.equal(w.state(), "off");
+  w.onclick(); assert.deepEqual(out.splice(0), ["active 1"]); assert.equal(w.state(), "on");
+  w.set("off3", 1); assert.equal(w.state(), "mod");                       // Mod only from before Poly: a click turns it off and releases 3OFF
+  w.onclick(); assert.deepEqual(out.splice(0), ["off3 0", "active 0"]); assert.equal(w.state(), "off");
 });
 
 test("paint: Active lit orange, Mod only lit blue, off unlit; dimmed in Poly (UI.button)", () => {
@@ -39,5 +42,6 @@ test("paint: Active lit orange, Mod only lit blue, off unlit; dimmed in Poly (UI
   assert.deepEqual(look(), [UI.btnOn, "Active"]);
   w.onclick(); assert.deepEqual(look(), [UI.line, "Mod only"]);
   w.onclick(); assert.deepEqual(look(), [UI.btnOff, "Active"]);
-  w.setEnabled(0); assert.deepEqual(look()[0], [0.2, 0.2, 0.2, 0.4]);
+  w.setEnabled(0); assert.deepEqual(look()[0], UI.btnOff);                // off stays unlit; Active in Poly turns grey
+  w.onclick(); assert.deepEqual(look()[0], UI.btnDimOn);
 });

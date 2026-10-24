@@ -133,16 +133,17 @@ function buildDevice(title) {
     // track's notes – goes through the gateway (validation, whitelist, one queue, store lock) and out of the device's own
     // [midiout] (on to External Instrument). The track's input goes to the capture (dumps saved, patches/replies to the loader
     // and the gateway, nothing global) and to the osc 1 router, which passes notes and drops SysEx (the echo rule).
-    const vGate = id(), vCap = id(), vStored = id(), vStoredPre = id(), vCapRoute = id(), vRepliedPre = id(), vGateRoute = id(), vNoReplyPre = id(), vAnsweredPre = id();
+    const vGate = id(), vCap = id(), vStored = id(), vStoredPre = id(), vCapRoute = id(), vRepliedPre = id(), vGateRoute = id(), vNoReplyPre = id(), vAnsweredPre = id(), vSentMsg = id();
     boxes.push(A.obj(vGate, "v8 sid.send.js", [30, 500, 100, 20], 2, ["", ""], { varname: "gateway" }),
       A.obj(vCap, "v8 sid.capture.js", [200, 60, 110, 20], 2, ["", ""], { varname: "capture" }),
       A.obj(vCapRoute, "route stored replied", [200, 90, 120, 20], 3, ["", "", ""]), A.obj(vStoredPre, "prepend stored", [200, 120, 90, 20]),
-      A.obj(vRepliedPre, "prepend replied", [300, 120, 90, 20]), A.obj(vGateRoute, "route noreply answered", [140, 530, 140, 20], 3, ["", "", ""]), A.obj(vNoReplyPre, "prepend noreply", [140, 560, 100, 20]),
-      A.obj(vAnsweredPre, "prepend answered", [250, 560, 100, 20]),
+      A.obj(vRepliedPre, "prepend replied", [300, 120, 90, 20]), A.obj(vGateRoute, "route noreply answered sent", [140, 530, 160, 20], 4, ["", "", "", ""]), A.obj(vNoReplyPre, "prepend noreply", [140, 560, 100, 20]),
+      A.obj(vAnsweredPre, "prepend answered", [250, 560, 100, 20]), A.msg(vSentMsg, "outside", [360, 560, 50, 20]),
       A.obj(vStored, "t l l", [320, 90, 40, 20], 2, ["", ""]));
     lines.push(A.line(vMidiin, 0, vCap, 0), A.line(vCap, 0, vStored, 0), A.line(vStored, 1, vRxDefer, 0), A.line(vStored, 0, vCapRoute, 0),
       A.line(vCapRoute, 0, vStoredPre, 0), A.line(vStoredPre, 0, vGate, 0), A.line(vCapRoute, 1, vRepliedPre, 0), A.line(vRepliedPre, 0, vGate, 0),
       A.line(vGate, 1, vGateRoute, 0), A.line(vGateRoute, 0, vNoReplyPre, 0), A.line(vNoReplyPre, 0, ctx.nameId, 0), A.line(vGateRoute, 1, vAnsweredPre, 0), A.line(vAnsweredPre, 0, ctx.nameId, 0),
+      A.line(vGateRoute, 2, vSentMsg, 0), A.line(vSentMsg, 0, ctx.nameId, 0),
       A.line(oscs[1].vV8, 0, vGate, 0), A.line(vGate, 0, vMidiout, 0));
     for (const [r, k] of routers) lines.push(A.line(r, k, vGate, 0));
     // Terminal control (tools/sid.js: cc, dp, request, settings, load/send a bank …) straight into the gateway.
