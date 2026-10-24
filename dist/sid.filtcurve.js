@@ -100,7 +100,8 @@ const solid = (c, a) => [c[0], c[1], c[2], a];
 
 // Q: the SID's resonance is gentle (never self-oscillates); 0 → Butterworth, 15 → a clear peak (~+10 dB).
 function q() { return 0.707 + (st.res / 15) * 2.3; }
-function bits() { return st.type + 1; }                                  // menu index → LP=1 BP=2 HP=4
+const TYPE_BITS = [1, 2, 3, 4, 5, 6, 7];                                 // menu index → LP=1 BP=2 HP=4 (SidParams FILTER ftype values)
+function bits() { return TYPE_BITS[st.type] || 1; }
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
 // Frequency response in dB at normalised axis position x (0..1) for a filter with cutoff at xc (default st.cutoff).

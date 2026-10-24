@@ -314,15 +314,16 @@ const COMMON_DP = { filterRouting: { addr: 0x18, mask: 0x07, shift: 0 }, filterT
 const FILTER = [
   { key: "cutoff",   name: "Filter Cutoff",       short: "Cutoff", cc: 27, dp: [0x1a, 0x7f, 0], min: 0, max: 127, unit: "int", init: 100 },
   { key: "res",      name: "Filter Resonance",    short: "Res",            dp: [0x18, 0x0f, 4], min: 0, max: 15,  unit: "int", init: 0 },
-  { key: "envdepth", name: "Filter Env Depth",    short: "Env",    cc: 28, dp: [0x1b, 0x7f, 0], min: 0, max: 127, unit: "int", init: 0 },
-  { key: "lfodepth", name: "Filter LFO Depth",    short: "LFO",    cc: 29, dp: [0x20, 0x7f, 0], min: 0, max: 127, unit: "int", init: 0 },
+  { key: "envdepth", name: "Filter Env Depth",    short: "F Env",  cc: 28, dp: [0x1b, 0x7f, 0], min: 0, max: 127, unit: "int", init: 0 },
+  { key: "lfodepth", name: "Filter LFO Depth",    short: "F LFO",  cc: 29, dp: [0x20, 0x7f, 0], min: 0, max: 127, unit: "int", init: 0 },
   { key: "fattack",  name: "Filter Attack",       short: "A",      cc: 30, dp: [0x1c, 0x7f, 0], min: 0, max: 127, unit: "int", init: 0 },
   { key: "fdecay",   name: "Filter Decay",        short: "D",      cc: 31, dp: [0x1d, 0x7f, 0], min: 0, max: 127, unit: "int", init: 64 },
   { key: "fsustain", name: "Filter Sustain",      short: "S",      cc: 32, dp: [0x1e, 0x7f, 0], min: 0, max: 127, unit: "int", init: 127 },
   { key: "frelease", name: "Filter Release",      short: "R",      cc: 33, dp: [0x1f, 0x7f, 0], min: 0, max: 127, unit: "int", init: 32 },
   { key: "wheel",    name: "Filter LFO Wheel",    short: "Wheel",          dp: [0x21, 0x7f, 0], min: 0, max: 127, unit: "int", init: 0 },
-  { key: "flfo",     name: "Filter LFO Select",   short: "F LFO",          dp: [0x19, 0x03, 4], min: 0, max: 3, unit: "enum", labels: ["LFO 1", "LFO 2", "LFO 3", "LFO 4"], init: 0 },
+  { key: "flfo",     name: "Filter LFO Select",   short: "F LFO#",         dp: [0x19, 0x03, 4], min: 0, max: 3, unit: "enum", labels: ["LFO 1", "LFO 2", "LFO 3", "LFO 4"], init: 0 },
   // The type menu as on the SidStation (manual pp. 25–26): seven combinations of the SID bits LP/BP/HP; values = the field value.
+  // Not named "Filter Type": Push would draw its four filter images and show nothing at all for the other three values.
   { key: "ftype",    name: "Filter Type",         short: "Type", field: "filterType", values: [1, 2, 3, 4, 5, 6, 7], min: 0, max: 6, unit: "enum",
     labels: ["Lowp", "Band", "L/B", "High", "L/H", "B/H", "All"], init: 0 },
   { key: "wrap",     name: "Filter Wrap",         short: "Wrap",           dp: [0x16, 0x01, 6], min: 0, max: 1, unit: "bool", init: 0 },
@@ -354,7 +355,7 @@ const LFO = [
   { key: "depth",    name: "Depth",      short: "Depth",  dumpOff: 4,  dp: B7, ccOff: 1, min: 0, max: 127, unit: "int", init: 0 },
   { key: "fadein",   name: "Fade In",    short: "Fade",   dumpOff: 10, dp: B7, ccOff: 3, min: 0, max: 127, unit: "int", init: 0 },
   { key: "samphold", name: "S/H",        short: "S/H",    dumpOff: 3,  dp: B7, ccOff: 4, min: 0, max: 127, unit: "int", init: 0 },
-  { key: "notesync", name: "Sync On",    short: "At note on",   dumpOff: 1,  dp: [0x01, 0], min: 0, max: 1, unit: "bool", init: 1 },
+  { key: "notesync", name: "Sync On",    short: "At note on",   push: "LFO Sync", dumpOff: 1,  dp: [0x01, 0], min: 0, max: 1, unit: "bool", init: 1 },
   { key: "invert",   name: "Invert",     short: "Inv",    dumpOff: 1,  dp: [0x01, 1], min: 0, max: 1, unit: "bool", init: 0 },
   { key: "abovezero",name: "Above Zero", short: "> 0",    dumpOff: 1,  dp: [0x01, 2], min: 0, max: 1, unit: "bool", init: 0 },
   { key: "offsync",  name: "Sync Off",   short: "At note off",    dumpOff: 1,  dp: [0x01, 3], min: 0, max: 1, unit: "bool", init: 0 },

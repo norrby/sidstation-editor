@@ -26,6 +26,7 @@ const { OSC_W, ENV_W, TABLE_W, SHIFT, oscPanel } = require("./station/voice");
 const { FVOICE_W, filterPanel } = require("./station/filter");
 const { LVOICE_W, lfoPanel } = require("./station/lfo");
 const { MAP_TOTAL, mapPanel } = require("./station/overview");
+const { parameters } = require("./station/banks");
 
 // The device: the overview, voices 1–3, the filter, LFO 1–4, and the one-track plumbing (gateway, capture).
 const OSCS = [1, 2, 3];
@@ -165,6 +166,7 @@ function buildDevice(title) {
   }
   boxes.push(A.verticalLimit());
   p.boxes = boxes; p.lines = lines;
+  p.parameters = parameters(boxes);                                     // Push banks (build/station/banks.js)
   return { json, layout, width };
 }
 

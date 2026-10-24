@@ -60,3 +60,9 @@ test("sweep bands: Env depth from cutoff upwards, downwards with Inv, clamped; L
   w.msg("type", 2); assert.equal(w.st.type, 2);
   w.paint();
 });
+
+test("the curve's type table matches the parameter's values (the synth's menu order)", () => {
+  const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.filtcurve.js"), "utf8");
+  const bits = JSON.parse(src.match(/const TYPE_BITS = (\[[^\]]*\]);/)[1]);
+  assert.deepEqual(bits, require("../lib/params").FILTER.find((d) => d.key === "ftype").values);
+});

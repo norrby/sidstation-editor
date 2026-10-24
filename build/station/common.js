@@ -26,13 +26,16 @@ const OUTS = { "live.menu": [3, ["", "", "float"]], "live.tab": [3, ["", "", "fl
   "live.numbox": [2, ["", "float"]], "live.toggle": [1, [""]], "live.text": [2, ["", ""]] };
 function live(id, cls, rect, pres, vo, extra = {}, varname = vo.parameter_longname) {
   const [n, types] = OUTS[cls];
+  // live.text ignores parameter_enum for the value Live and Push show: that is automation/automationon ("val1"/"val2" by default)
+  const shown = cls === "live.text" && vo.parameter_enum ? { automation: vo.parameter_enum[0], automationon: vo.parameter_enum[1] } : {};
   return { box: { id, maxclass: cls, numinlets: 1, numoutlets: n, outlettype: types, parameter_enable: 1,
     patching_rect: rect, ...(pres ? { presentation: 1, presentation_rect: pres } : {}),
-    varname, saved_attribute_attributes: { valueof: vo }, ...extra } };
+    varname, saved_attribute_attributes: { valueof: vo }, ...shown, ...extra } };
 }
 const UNIT = { int: 0, semitones: 7 };
 function valueof(d, longPrefix) {
-  const vo = { parameter_longname: longPrefix + d.name, parameter_shortname: d.short, parameter_modmode: 0, parameter_initial_enable: 1, parameter_initial: [d.init] };
+  // d.push: the name Push shows, where it differs from the label in the device (a name Push has images for)
+  const vo = { parameter_longname: longPrefix + d.name, parameter_shortname: d.push || d.short, parameter_modmode: 0, parameter_initial_enable: 1, parameter_initial: [d.init] };
   if (d.unit === "enum") Object.assign(vo, { parameter_type: 2, parameter_enum: d.labels, parameter_mmax: d.labels.length - 1 });
   else if (d.unit === "bool") Object.assign(vo, { parameter_type: 2, parameter_enum: ["off", "on"], parameter_mmax: 1 });
   else Object.assign(vo, { parameter_type: 1, parameter_mmin: d.min, parameter_mmax: d.max, parameter_unitstyle: UNIT[d.unit] });

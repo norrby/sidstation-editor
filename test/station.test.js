@@ -169,3 +169,27 @@ test("SidStation (one track): no global bus; midiout is fed only by the built-in
   const [udp] = id(/^udpreceive 9871$/);
   assert.ok(into(gate).some((s) => s[0] === udp), "terminal control (tools/sid.js) -> gateway");
 });
+
+test("SidStation: Push banks of 8 by long name; no show/hide tabs, table data, name letters or patch buttons", () => {
+  const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", "SidStation.amxd")).json.patcher;
+  const banks = Object.values(p.parameters.parameterbanks);
+  assert.equal(banks.length, 21);
+  assert.deepEqual(banks.map((b) => b.index), banks.map((_, i) => i));
+  const longs = new Set(p.boxes.map((b) => b.box.saved_attribute_attributes && b.box.saved_attribute_attributes.valueof && b.box.saved_attribute_attributes.valueof.parameter_longname).filter(Boolean));
+  for (const b of banks) {
+    assert.equal(b.parameters.length, 8, b.name);
+    for (const n of b.parameters.filter((x) => x !== "-")) {
+      assert.ok(longs.has(n), b.name + ": " + n);
+      assert.doesNotMatch(n, /(Table|Env|Show|Table Data|Table Clear)$|^LFO Select$|^Name \d|Patch$/, b.name + ": " + n);
+    }
+  }
+  assert.deepEqual(banks[0].parameters, ["Filter Cutoff", "Filter Resonance", "Filter Type", "Filter Env Depth", "Filter LFO Depth", "Osc 1 Active", "Osc 2 Active", "Osc 3 Active"]);
+});
+
+test("SidStation: every live.text shows its parameter's values in Live and on Push (automation/automationon), never val1/val2", () => {
+  const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", "SidStation.amxd")).json.patcher;
+  for (const { box: b } of p.boxes.filter((x) => x.box.maxclass === "live.text")) {
+    const e = b.saved_attribute_attributes.valueof.parameter_enum;
+    assert.deepEqual([b.automation, b.automationon], e, b.varname);
+  }
+});

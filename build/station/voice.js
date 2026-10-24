@@ -155,7 +155,9 @@ function oscPanel(n, cx0, ctx) {
     if (cls === "live.menu" || cls === "live.numbox") extra = { fontsize: 9 };
     if (cls === "live.tab") extra = { mode: 0, num_lines_patching: 5, num_lines_presentation: 5, spacing_x: 2, spacing_y: 2, pictures: WAVE_ICONS, usepicture: 1, remapsvgcolors: 1 };
     const Lb = id(); ids[d.key] = Lb;
-    boxes.push(live(Lb, cls, [x, py + 210, 60, cls === "live.dial" ? 48 : cls === "live.tab" ? 100 : 18], pres, valueof(d, longPre), extra, pre + d.key));
+    const vo = valueof(d, longPre);
+    if (d.key === "active") vo.parameter_shortname = "Osc " + n;      // Push shows the three side by side on its Main bank; the button still reads Active
+    boxes.push(live(Lb, cls, [x, py + 210, 60, cls === "live.dial" ? 48 : cls === "live.tab" ? 100 : 18], pres, vo, extra, pre + d.key));
     if (d.key === "wave") waveId = Lb;
     if (d.key === "tablespeed") {                                        // the playhead needs the speed; the layout dims the tbl row at 0
       const vSp = id(), vTs = id();
@@ -216,7 +218,7 @@ function oscPanel(n, cx0, ctx) {
     A.obj(vModePre, "prepend trackmode", [1500, py + 290, 100, 20]),
     A.obj(vEnable, "prepend enable", [1500, py + 320, 90, 20]),
     live(vNote, "live.numbox", [1620, py + 210, 60, 18], null,
-      { parameter_longname: longPre + "Fixed Note", parameter_shortname: "Note", parameter_type: 1, parameter_mmin: 1, parameter_mmax: 100, parameter_unitstyle: 0,
+      { parameter_longname: longPre + "Fixed Note", parameter_shortname: "Note", parameter_type: 1, parameter_mmin: 1, parameter_mmax: 100, parameter_unitstyle: 8,
         parameter_modmode: 0, parameter_initial_enable: 1, parameter_initial: [60] }, {}, pre + "tracknote"),
     A.obj(vNotePre, "prepend tracknote", [1620, py + 290, 100, 20]),
     v8ui(vNoteW, "sid.note.js", [1740, py + 210, 44, 18], px(TRACK_NOTE), pre + "notepick"),

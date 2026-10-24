@@ -175,6 +175,19 @@ function apply(i, code, silent) {
   return true;
 }
 function syncEdit() { outlet(1, "set", text().replace(/\s+$/, "")); }      // textedit follows along (silently)
+// The device takes the patch name as its own name, so Push shows it in its header (an empty name gives "SidStation"). Set once,
+// 300 ms after the last change: a dump sets ten characters one by one, and every rename is a step in Live's undo history.
+let renameTask = null;
+function renameDevice() {
+  if (typeof LiveAPI === "undefined" || typeof Task === "undefined") return;     // not in Max (tests)
+  if (!renameTask) renameTask = new Task(() => {
+    try {
+      const dev = new LiveAPI("this_device"), want = text().trim() || "SidStation";
+      if (String(dev.get("name")) !== want) { dev.set("name", want); sidlog("name", "device name", JSON.stringify(want)); }
+    } catch (e) { sidlog("name", "cannot rename the device", e.message); }
+  });
+  renameTask.cancel(); renameTask.schedule(300);
+}
 // The field is shown on the display's rect, which is read from the patcher on click (the layout engine owns the rect). Once the
 // display hid but the field didn't show – the overview's v8ui draws on top, so the field is raised with bringtofront after
 // being shown. While typing the display is hidden (presentation 0) and the field shown in its place: otherwise the field lay under the
@@ -225,6 +238,7 @@ function typed() {
   // Return sends the whole name, all ten characters – the synth may hold a different name than the editor thinks, so the changed characters alone are not enough.
   for (let i = 0; i < N; i++) apply(i, i < s.length ? s.charCodeAt(i) : 32, true);
   bang();
+  renameDevice();
   if (s !== raw) outlet(1, "set", s);                                        // the field shows what actually applies
   showEdit(false);
 }
@@ -236,7 +250,7 @@ function set() {
     const s = a.slice(1).map(String).join(" ");
     for (let i = 0; i < N; i++) changed = apply(i, i < s.length ? s.charCodeAt(i) : 32, true) || changed;
   } else { post("sid.name: unknown set " + a.join(" ") + "\n"); return; }
-  if (changed) { cursor = -1; syncEdit(); if (shownRect) showEdit(false); mgraphics.redraw(); }   // change from outside (dump) closes the field (it stayed open after Pull); echoes of our own characters change nothing
+  if (changed) { cursor = -1; syncEdit(); if (shownRect) showEdit(false); mgraphics.redraw(); renameDevice(); }   // change from outside (dump) closes the field (it stayed open after Pull); echoes of our own characters change nothing
 }
 // Esc in the field (textedit outlet 1, key 27): close without sending, the field goes back to the current name.
 function cancel() { if (!shownRect) return; sidlog("name", "editing cancelled"); syncEdit(); showEdit(false); }

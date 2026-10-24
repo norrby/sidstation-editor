@@ -9,6 +9,7 @@ dist/SidTableTest.amxd
 dist/sid.probe.js
 dist/sid.fake.js
 # generated
+release/
 node_modules/
 logs/
 .DS_Store
