@@ -51,11 +51,21 @@ const muted = () => !armed || Date.now() < quietUntil;
 const midiIn = midiParser({
   realtime: (b) => outlet(0, b),
   channel: (m) => {
+    if ((m[0] & 0xf0) === 0xb0 && m[1] === SidParams.PUSH_CC) { pushCC(m[2]); return; }   // the editor's own CC: never to the synth
     for (const x of m) outlet(0, x);
     const st = m[0] >> 4;                             // note on/off -> outlet 1 for the table playheads (sid.table.js)
     if (st === 0x9 || st === 0x8) outlet(1, "note", st === 0x9 && m[2] > 0 ? 1 : 0);
   },
 });
+let lastPushCC = -Infinity;
+function pushCC(v) {
+  if (!(v > 0)) return;
+  const now = Date.now();
+  if (now - lastPushCC < SidParams.PUSH_CC_GAP_MS) { sidlog("osc" + osc, "CC " + SidParams.PUSH_CC + " ignored: pushed " + (now - lastPushCC) + " ms ago"); return; }
+  lastPushCC = now;
+  sidlog("osc" + osc, "Push patch from CC " + SidParams.PUSH_CC);
+  outlet(1, "pushcc");                                                     // -> sendall to every router (build-station.js)
+}
 function msg_int(b) { midiIn(b); }                                   // a declared function: Max looks msg_int up on the global object
 
 

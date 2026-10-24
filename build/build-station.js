@@ -81,10 +81,14 @@ function buildDevice(title) {
   }
   // note on/off from the router that sees the track's notes -> every table playhead (all three voices start at a note, single mode)
   {
-    const vNote = id(), vNotePre = id();
-    boxes.push(A.obj(vNote, "route note", [30, 520, 70, 20], 2, ["", ""]), A.obj(vNotePre, "prepend note", [30, 545, 80, 20]));
-    lines.push(A.line(oscs[1].vV8, 1, vNote, 0), A.line(vNote, 0, vNotePre, 0));
+    const vNote = id(), vNotePre = id(), vPushCC = id();
+    boxes.push(A.obj(vNote, "route note pushcc", [30, 520, 100, 20], 3, ["", "", ""]), A.obj(vNotePre, "prepend note", [30, 545, 80, 20]),
+      A.msg(vPushCC, "sendall", [140, 545, 60, 20]));
+    lines.push(A.line(oscs[1].vV8, 1, vNote, 0), A.line(vNote, 0, vNotePre, 0), A.line(vNote, 1, vPushCC, 0));
     for (const n of OSCS) lines.push(A.line(vNotePre, 0, oscs[n].tableId, 0));
+    // CC 119 (SidParams.PUSH_CC) on the track: Push patch, at most every 5 s (sid.osc.js pushCC)
+    for (const n of OSCS) lines.push(A.line(vPushCC, 0, oscs[n].vV8, 0));
+    lines.push(A.line(vPushCC, 0, vFilter, 0), A.line(vPushCC, 0, vLfo, 0));
   }
   const fp = filterPanel(x0, ctx); panels.push(fp.panel); x0 += FVOICE_W + GAP;
   panels.push(lfoPanel(x0, ctx)); x0 += LVOICE_W + GAP;

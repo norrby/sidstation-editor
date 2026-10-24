@@ -307,6 +307,10 @@ function oscDP(osc, def) {
 }
 // Common DP rows (manual): filter routing = three bits in idx 24 (FLT3 FLT2 FLT1) and filter type = three
 // bits in idx 25 (HP BP LP, SID bitmask, shown as a type menu); both are written as one field by the filter router.
+// CC 119 on the track's MIDI (a clip or a controller button), value > 0: Push patch. At most one push per PUSH_CC_GAP_MS (a push
+// takes about a second), so a short looping clip cannot flood the synth. Unused by the synth (manual p. 38) and undefined in
+// MIDI; the editor keeps it, it never reaches the synth.
+const PUSH_CC = 119, PUSH_CC_GAP_MS = 5000;
 const NAME_LEN = 10;            // PATCH_NAME: ten ASCII characters, DP rows 00 00 7f 00 … 00 09 7f 00 [M p. 42]
 const COMMON_DP = { filterRouting: { addr: 0x18, mask: 0x07, shift: 0 }, filterType: { addr: 0x19, mask: 0x07, shift: 0 } };
 // The filter [M]: CC 27–33 for cutoff, env depth, LFO depth, A, D, S, R (all 0..127); the rest via DP.
@@ -392,7 +396,7 @@ function dpRows() {
 function toCC(v, min, max) { return Math.round((v - min) * 127 / (max - min)); }
 function fromCC(cc, min, max) { return min + Math.round(cc * (max - min) / 127); }
 
-const SidParams = { OSC, TABLE_DP_BASE, TABLE_ROWS, tableDP, FILTER, COMMON, LFO, LFO_DP_BASE, LFO_DUMP_BASE, lfoCC, lfoDP, OSC_CC_BASE, OSC_DP_BASE, COMMON_DP, NAME_LEN, ATTACK_MS, DECAY_MS, fmtMs, noteName, oscCC, oscDP, dpRows, toCC, fromCC };
+const SidParams = { OSC, TABLE_DP_BASE, TABLE_ROWS, tableDP, FILTER, COMMON, LFO, LFO_DP_BASE, LFO_DUMP_BASE, lfoCC, lfoDP, OSC_CC_BASE, OSC_DP_BASE, COMMON_DP, PUSH_CC, PUSH_CC_GAP_MS, NAME_LEN, ATTACK_MS, DECAY_MS, fmtMs, noteName, oscCC, oscDP, dpRows, toCC, fromCC };
 if (typeof module !== "undefined" && module.exports) module.exports = SidParams;
 
 
@@ -487,11 +491,21 @@ const muted = () => !armed || Date.now() < quietUntil;
 const midiIn = midiParser({
   realtime: (b) => outlet(0, b),
   channel: (m) => {
+    if ((m[0] & 0xf0) === 0xb0 && m[1] === SidParams.PUSH_CC) { pushCC(m[2]); return; }   // the editor's own CC: never to the synth
     for (const x of m) outlet(0, x);
     const st = m[0] >> 4;                             // note on/off -> outlet 1 for the table playheads (sid.table.js)
     if (st === 0x9 || st === 0x8) outlet(1, "note", st === 0x9 && m[2] > 0 ? 1 : 0);
   },
 });
+let lastPushCC = -Infinity;
+function pushCC(v) {
+  if (!(v > 0)) return;
+  const now = Date.now();
+  if (now - lastPushCC < SidParams.PUSH_CC_GAP_MS) { sidlog("osc" + osc, "CC " + SidParams.PUSH_CC + " ignored: pushed " + (now - lastPushCC) + " ms ago"); return; }
+  lastPushCC = now;
+  sidlog("osc" + osc, "Push patch from CC " + SidParams.PUSH_CC);
+  outlet(1, "pushcc");                                                     // -> sendall to every router (build-station.js)
+}
 function msg_int(b) { midiIn(b); }                                   // a declared function: Max looks msg_int up on the global object
 
 

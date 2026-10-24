@@ -20,6 +20,10 @@ Not affiliated with or endorsed by Elektron. Use at your own risk.
 - **Osc 3 "Mod only"** (the SID's 3OFF): oscillator 3 keeps running for sync and ring modulation
   without being heard.
 - **Push patch** sends the whole editor state to the synth's edit buffer.
+- **CC 119** (value above 0) on the track, from a clip or a controller button, pushes the patch too,
+  at most once every 5 seconds. Put it at the start of a song so the synth plays what the editor
+  shows. The editor keeps CC 119 to itself; it never reaches the synth.
+- Loading a Live Set or the device sends nothing to the synth.
 - **Pull patch / Store patch** and the settings request need a firmware with dump-request and
   store support (see below). With the stock OS the synth does not answer, and the editor shows
   **NO REPLY**.
@@ -56,7 +60,8 @@ One MIDI track does everything:
 - **Devices:** `SidStation`, then Live's **External Instrument** with *MIDI To* = the synth's port.
 - **MIDI From:** a port that hears the synth's **MIDI Out** (the interface's input, or *All Ins*).
   It must never hear the track's own output through a loop.
-- **Monitor:** *In*, track armed.
+- **Monitor:** *Auto*, track armed: the keyboard, the track's clips and the synth's replies all reach
+  the editor. (*In* silences the clips.)
 - In Live's MIDI settings, keep *Remote* off for the synth's ports: with it on, Live itself sends
   mapped values to the synth.
 

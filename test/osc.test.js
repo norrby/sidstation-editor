@@ -138,3 +138,13 @@ test("quiet (patch dump on its way in): nothing to the bus during the window, th
   out.length = 0; r.msg("quiet"); r.msg("sendall");
   assert.ok(bus(out).length > 0, "Push patch breaks the silence and sends everything");
 });
+
+test("CC 119 on the track is the editor's own: never to the synth, value > 0 pushes, at most once every 5 s", () => {
+  const { r, out } = loadRouter(1);
+  const pushes = () => out.filter((o) => o[1] === "pushcc").length;
+  for (const b of [0xb0, 119, 127, 0xb0, 119, 0, 0xb0, 7, 100]) r.msg_int(b);
+  assert.deepEqual(bytes(out), [0xb0, 7, 100], "only the other CC passes");
+  assert.equal(pushes(), 1, "127 pushes, 0 does not");
+  for (const b of [0xb0, 119, 127]) r.msg_int(b);
+  assert.equal(pushes(), 1, "a loop right after: ignored");
+});
