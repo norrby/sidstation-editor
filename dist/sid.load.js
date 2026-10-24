@@ -54,8 +54,9 @@ const noteName = (n) => NOTE_NAMES[n % 12] + (Math.floor(n / 12) - 2);
 const B7 = [0x7f, 0], B4 = [0x0f, 0];
 const OSC = [
   { key: "active",     name: "Active",        short: "Active", cc: [24, 25, 26], dumpOff: null, min: 0, max: 1, unit: "bool", init: 1 },
-  { key: "wave",       name: "Wave",          short: "Wave",   dumpOff: 15, dp: [0x0f, 4], min: 0, max: 4, unit: "enum",
-    labels: ["Tri", "Saw", "Pulse", "Mixed", "Noise"], codes: [1, 2, 4, 5, 8], init: 2 },
+  { key: "wave",       name: "Wave",          short: "Wave",   dumpOff: 15, dp: [0x0f, 4], min: 0, max: 5, unit: "enum",
+    // Off (code 0): no waveform selected in the SID, a silent oscillator (some patches have it). Last, so saved sets keep their index.
+    labels: ["Tri", "Saw", "Pulse", "Mixed", "Noise", "Off"], codes: [1, 2, 4, 5, 8, 0], init: 2 },
   { key: "pwsync",     name: "PWM Sync",      short: "PW Sync", dumpOff: 0, dp: [0x01, 0], min: 0, max: 1, unit: "bool", init: 1 },
   { key: "gate",       name: "Gate",          short: "Gate",   dumpOff: 0,  dp: [0x01, 1], min: 0, max: 1, unit: "bool", init: 0 },
   { key: "pbrange",    name: "PB Range",      short: "PB",     dumpOff: 5,  dp: B7, min: 0, max: 24, unit: "semitones", init: 2 },

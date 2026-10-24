@@ -18,7 +18,7 @@ const lfo = (n) => {
 };
 
 const BANKS = [
-  ["Main", ["Filter Cutoff", "Filter Resonance", "Filter Type", "Filter Env Depth", "Filter LFO Depth", "Osc 1 Active", "Osc 2 Active", "Osc 3 Active"]],
+  ["Main", ["Filter Cutoff", "Filter Resonance", "Filter Type", "Filter Env Depth", "Filter LFO Depth", "Osc 1 Wave", "Osc 2 Wave", "Osc 3 Wave"]],   // Wave Off = the oscillator off
   ["Patch", ["Poly", "Legato", "HCut", "Osc 3 Off", "Osc 1 Fixed Note", "Osc 2 Fixed Note", "Osc 3 Fixed Note", null]],
   ["Filter", ["Filter Cutoff", "Filter Resonance", "Filter Type", "Filter Env Depth", "Filter LFO Depth", "Filter LFO Select", "Filter Env Invert", "Filter Wrap"]],
   ["Filter Env", ["Filter Attack", "Filter Decay", "Filter Sustain", "Filter Release", "Filter LFO Wheel", "Osc 1 Filter", "Osc 2 Filter", "Osc 3 Filter"]],

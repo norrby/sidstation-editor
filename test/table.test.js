@@ -46,9 +46,20 @@ test("DATA2 FF is no pitch change (---) and is written back as FF (R33 $9480)", 
 test("Loop: FE xx reads back, the target is clamped below the loop step", () => {
   const { w, out } = loadWidget();
   w.bytes(0x10, 0x30, 0x20, 0xc0, 0x40, 0x3c, 0xfe, 0x01);
-  assert.equal(w.term, "loop"); assert.equal(last(out), "bytes 16 48 32 255 64 60 254 1");   // a difference of 0 is written as FF
+  assert.equal(w.term, "loop"); assert.equal(last(out), "bytes 16 48 32 192 64 60 254 1");   // a step read in goes back as it was (C0)
   w.bytes(0x10, 0x30, 0xfe, 0x05);
   assert.equal(last(out), "bytes 16 48 254 0");
+});
+
+test("Pull + Push is exact: steps read in go back byte for byte until edited, also what the editor only approximates", () => {
+  const { w, out } = loadWidget();
+  // fixed 83 (above the panel's 81), subtract 53 (over 47), add 0, an unknown wave code 3 with the unused bits 0 and 3 set
+  w.bytes(0x10, 0x53, 0x20, 0xb5, 0x40, 0xc0, 0x39, 0x30, 0xff);
+  assert.equal(last(out), "bytes 16 83 32 181 64 192 57 48 255");
+  assert.equal(w.steps[0].mode, "F"); assert.equal(w.steps[0].fixed, 83);
+  w.steps[1].rel = -12;                                                    // an edit: that step is encoded again, the rest stay
+  w.bang();
+  assert.equal(last(out), "bytes 16 83 32 140 64 192 57 48 255");
 });
 
 test("clicks: wave cycles, mod cycles off -> sync -> ring -> s+r; columns after the table ignore clicks", () => {

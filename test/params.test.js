@@ -52,7 +52,7 @@ test("Direct Program rows: address = base + dumpOff, osc3 goes beyond 7 bits, ac
   assert.deepEqual(P.oscDP(2, def("active")), { addr: 0x16, mask: 0x01, shift: 1 });
   assert.equal(P.oscDP(1, def("sync")), null);
   assert.ok(P.dpRows().has("86:15:4") && !P.dpRows().has("86:15:0"));
-  assert.deepEqual(def("wave").codes, [1, 2, 4, 5, 8]);
+  assert.deepEqual(def("wave").codes, [1, 2, 4, 5, 8, 0]);                // 0 = Off, last
 });
 
 test("Track: synth value 0..100, CC reaches 99 (ccMax), UI = Key follow + note", () => {

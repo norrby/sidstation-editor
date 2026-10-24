@@ -188,7 +188,7 @@ test("SidStation: Push banks of 8 by long name; no show/hide tabs, table data, n
       assert.doesNotMatch(n, /(Table|Env|Show|Table Data|Table Clear)$|^LFO Select$|^Name \d|Patch$/, b.name + ": " + n);
     }
   }
-  assert.deepEqual(banks[0].parameters, ["Filter Cutoff", "Filter Resonance", "Filter Type", "Filter Env Depth", "Filter LFO Depth", "Osc 1 Active", "Osc 2 Active", "Osc 3 Active"]);
+  assert.deepEqual(banks[0].parameters, ["Filter Cutoff", "Filter Resonance", "Filter Type", "Filter Env Depth", "Filter LFO Depth", "Osc 1 Wave", "Osc 2 Wave", "Osc 3 Wave"]);
 });
 
 test("SidStation: every live.text shows its parameter's values in Live and on Push (automation/automationon), never val1/val2", () => {

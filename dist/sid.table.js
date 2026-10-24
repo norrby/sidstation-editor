@@ -85,7 +85,7 @@ if (typeof module !== "undefined" && module.exports) module.exports = { UI };
 //
 // Data (dump/DP): two bytes per step. DATA1 = wave code << 4 | ring << 2 | sync << 1, codes
 // Tri 1, Saw 2, Pulse 4, Mix 5, Noise 8, Off 0, --- 9; FE xx = Loop to xx, FF = End (one byte in the dump).
-// DATA2 = 00..51 fixed note, C0+n add n, 80+n subtract n – as on the manual's DP page (p. 43); the dump table says the
+// DATA2 = 00..7F fixed note (the panel offers 00..51), C0+n add n, 80+n subtract n – as on the manual's DP page (p. 43); the dump table says the
 // opposite, but the factory patches settle it: SidDrum has fixed notes 21 20 1D 10 (33 32 29 16, falling) and TuneDrum the same
 // numbers as E1 E0 DD D0, i.e. C0 + 33 32 29 16 (the tunable version of the same drum); Bassdrum D9 D1 CF … C0.
 // R33's step routine ($9471–$94A0) settles DATA2: 00..7F fixed, pitch = DATA2 + 12 ($949B ADDA #$0C; the base pitch is the MIDI
@@ -232,8 +232,8 @@ function paint() {
     if (!active) continue;
     const s = steps[i], bx = x + 2, bw = g.cw - 4;
     // pitch
-    if (s.mode === "F") { const hh = (s.fixed / 81) * g.barH; rect(C.fixed, bx, g.barY + g.barH - hh, bw, Math.max(1, hh)); }
-    else if (s.mode === "rel" && s.rel !== 0) { const hh = (Math.abs(s.rel) / 47) * (g.barH / 2); rect(C.rel, bx, s.rel >= 0 ? g.mid - hh : g.mid, bw, Math.max(1, hh)); }
+    if (s.mode === "F") { const hh = (Math.min(s.fixed, 81) / 81) * g.barH; rect(C.fixed, bx, g.barY + g.barH - hh, bw, Math.max(1, hh)); }
+    else if (s.mode === "rel" && s.rel !== 0) { const hh = (Math.min(Math.abs(s.rel), 47) / 47) * (g.barH / 2); rect(C.rel, bx, s.rel >= 0 ? g.mid - hh : g.mid, bw, Math.max(1, hh)); }
     else line(C.keep, [[bx, g.mid], [bx + bw, g.mid]], 1);
     // the buttons: wave, sync, ring, pitch mode
     const wv = WAVES[s.wave];
@@ -283,7 +283,7 @@ function paint() {
   const tagCol = drag && drag.type === "pitch" ? (drag.painting ? drag.col2 : drag.col) : -1;
   if (tagCol >= 0 && tagCol < n && steps[tagCol].mode !== "keep") {
     const s = steps[tagCol], x = colX(g, tagCol) + g.cw / 2, t = pitchText(s);
-    const top = s.mode === "F" ? g.barY + g.barH - (s.fixed / 81) * g.barH : s.rel >= 0 ? g.mid - (s.rel / 47) * (g.barH / 2) : g.mid;
+    const top = s.mode === "F" ? g.barY + g.barH - (Math.min(s.fixed, 81) / 81) * g.barH : s.rel >= 0 ? g.mid - (Math.min(s.rel, 47) / 47) * (g.barH / 2) : g.mid;
     const ty = Math.max(g.pitchY + 1, top - 14), tw = t.length * 6 + 6, tx = Math.max(g.x0, Math.min(g.w - g.pad - tw, x - tw / 2));
     rect([0, 0, 0, 0.75], tx, ty, tw, 12);
     text(s.mode === "F" ? C.fixed : C.rel, t, tx + tw / 2, ty + 9, 9, true);
@@ -334,7 +334,7 @@ function onclick(x, y, but, cmd, shift) {
     // The mode from where the drag starts: on the step's own bar it stays; otherwise the bottom quarter = fixed tone (from C3 if it
     // was not one), above it = difference (from 0). Then the value moves with the distance dragged.
     const end = s.mode === "rel" ? g.mid - (s.rel / 47) * (g.barH / 2) : g.mid;          // a difference bar runs from the centre line to end
-    const onBar = s.mode === "F" ? y >= g.barY + g.barH - (s.fixed / 81) * g.barH - 3
+    const onBar = s.mode === "F" ? y >= g.barY + g.barH - (Math.min(s.fixed, 81) / 81) * g.barH - 3
       : s.mode === "rel" && s.rel !== 0 ? y >= Math.min(end, g.mid) - 3 && y <= Math.max(end, g.mid) + 3 : false;
     if (!onBar) {
       if (y >= g.barY + g.barH * 0.75) { if (s.mode !== "F") { s.mode = "F"; s.fixed = 60 - FIXED_OFFSET; } }
@@ -391,10 +391,14 @@ function changed(quietWhileDragging) { mgraphics.redraw(); if (!(quietWhileDragg
 
 // --- data -----------------------------------------------------------------
 
+// A step read from the synth keeps its bytes and goes back unchanged until it is edited: Pull + Push gives the same table even
+// where the editor shows an approximation (an unknown waveform code, the unused bits 0 and 3, a difference over 47).
+const stepKey = (s) => [s.wave, s.sync, s.ring, s.mode, s.fixed, s.rel].join(" ");
 function encode() {
   const b = [];
   for (let i = 0; i < n; i++) {
     const s = steps[i];
+    if (s.raw && stepKey(s) === s.rawKey) { b.push(s.raw[0], s.raw[1]); continue; }
     b.push(WAVES[s.wave].code << 4 | s.ring << 2 | s.sync << 1);
     // no change = FF (R33 $9480); a difference of 0 is the same thing to the synth (adds 0), so it is written as FF too
     b.push(s.mode === "F" ? s.fixed : s.mode === "keep" || s.rel === 0 ? 0xff : s.rel >= 0 ? 0xc0 + s.rel : 0x80 - s.rel);
@@ -415,10 +419,10 @@ function bytes() {
     const s = steps[n++], w = WAVES.findIndex((v) => v.code === d1 >> 4);
     s.wave = w < 0 ? 6 : w; s.ring = (d1 >> 2) & 1; s.sync = (d1 >> 1) & 1;
     if (d2 === 0xff) s.mode = "keep";
-    else if (d2 <= 0x51) { s.mode = "F"; s.fixed = d2; }
-    else if (d2 >= 0x80 && d2 < 0xc0) { s.mode = "rel"; s.rel = -Math.min(47, d2 - 0x80); }
-    else if (d2 >= 0xc0) { s.mode = "rel"; s.rel = Math.min(47, d2 - 0xc0); }
-    else { s.mode = "F"; s.fixed = 81; sidlog("table", "step", n - 1, "DATA2", d2, "outside 00..51/80..FF, shown as 81"); }
+    else if (d2 <= 0x7f) { s.mode = "F"; s.fixed = d2; }                        // 00..7F (the panel only offers 00..51)
+    else if (d2 < 0xc0) { s.mode = "rel"; s.rel = -(d2 - 0x80); }
+    else { s.mode = "rel"; s.rel = d2 - 0xc0; }
+    s.raw = [d1 & 0xff, d2 & 0xff]; s.rawKey = stepKey(s);
   }
   sidlog("table", "in:", n, "steps,", n >= MAXCOL ? "full (no command)" : term === "loop" ? "loop to " + target : "end");
   mgraphics.redraw(); out();

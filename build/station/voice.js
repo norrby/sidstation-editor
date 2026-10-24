@@ -16,7 +16,7 @@ const TABLE_WIDGET_W = 576;
 const TABLE_W = PAD + 44 + GAP + TABLE_WIDGET_W + PAD;
 const WAVE_COMPACT_W = 60;                                     // the "Waveform" title must fit
 const SHIFT = X.pitch - (X.wave + WAVE_COMPACT_W + GAP);       // offset when the pulse group is hidden
-const WAVE_ICONS = ["wave-tri.svg", "wave-saw.svg", "wave-pulse.svg", "wave-mixed.svg", "wave-noise.svg"];
+const WAVE_ICONS = ["wave-tri.svg", "wave-saw.svg", "wave-pulse.svg", "wave-mixed.svg", "wave-noise.svg", "wave-off.svg"];
 // key -> [class, rect | [x,y] for dials | null = not in the presentation]
 const PRES = {
   active:    ["live.text", [X.btn, 78, COL_W, 18]],                // below the three fold rows
@@ -153,10 +153,10 @@ function oscPanel(n, cx0, ctx) {
     let extra = {};
     if (cls === "live.text") extra = { text: d.short, texton: d.short, mode: 1, fontsize: 9 };   // mode 1 = toggle
     if (cls === "live.menu" || cls === "live.numbox") extra = { fontsize: 9 };
-    if (cls === "live.tab") extra = { mode: 0, num_lines_patching: 5, num_lines_presentation: 5, spacing_x: 2, spacing_y: 2, pictures: WAVE_ICONS, usepicture: 1, remapsvgcolors: 1 };
+    if (cls === "live.tab") extra = { mode: 0, num_lines_patching: 6, num_lines_presentation: 6, spacing_x: 2, spacing_y: 2, pictures: WAVE_ICONS, usepicture: 1, remapsvgcolors: 1 };
     const Lb = id(); ids[d.key] = Lb;
     const vo = valueof(d, longPre);
-    if (d.key === "active") vo.parameter_shortname = "Osc " + n;      // Push shows the three side by side on its Main bank; the button still reads Active
+    if (d.key === "wave") vo.parameter_shortname = "Osc " + n;        // Push shows the three side by side on its Main bank (Off = the oscillator off)
     boxes.push(live(Lb, cls, [x, py + 210, 60, cls === "live.dial" ? 48 : cls === "live.tab" ? 100 : 18], pres, vo, extra, pre + d.key));
     if (d.key === "wave") waveId = Lb;
     if (d.key === "tablespeed") {                                        // the playhead needs the speed; the layout dims the tbl row at 0
@@ -205,8 +205,9 @@ function oscPanel(n, cx0, ctx) {
   if (n === 3) { activeBtnId = id(); boxes.push(v8ui(activeBtnId, "sid.activebtn.js", [1360, py + 260, 52, 18], pc(rectOf("active")), pre + "activebtn")); }
   // ringok from the router (outlet 1): the Ring button is disabled when the waveform is not Tri/Mixed
   const vRingOk = id(), vRingAct = id();
-  boxes.push(A.obj(vRingOk, "route ringok", [200, py + 430, 80, 20], 2, ["", ""]), A.obj(vRingAct, "prepend active", [200, py + 460, 90, 20]));
-  lines.push(A.line(vV8, 1, vRingOk, 0), A.line(vRingOk, 0, vRingAct, 0), A.line(vRingAct, 0, ids.ring, 0));
+  // setactive from the router (choosing a waveform / Off): the Active parameter itself, so Live, Push and the synth follow
+  boxes.push(A.obj(vRingOk, "route ringok setactive", [200, py + 430, 120, 20], 3, ["", "", ""]), A.obj(vRingAct, "prepend active", [200, py + 460, 90, 20]));
+  lines.push(A.line(vV8, 1, vRingOk, 0), A.line(vRingOk, 0, vRingAct, 0), A.line(vRingAct, 0, ids.ring, 0), A.line(vRingOk, 1, ids.active, 0));
 
   // Track: radio button [live.tab] Key follow | Note + the note picker sid.note.js (the synth's note names).
   const vMode = id(), vModePre = id(), vNote = id(), vNotePre = id(), vNoteW = id(), vNoteRoute = id(), vNoteSet = id(), vEnable = id();

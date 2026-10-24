@@ -148,3 +148,19 @@ test("CC 119 on the track is the editor's own: never to the synth, value > 0 pus
   for (const b of [0xb0, 119, 127]) r.msg_int(b);
   assert.equal(pushes(), 1, "a loop right after: ignored");
 });
+
+test("choosing Off switches the oscillator off, choosing a waveform switches it on; never on load, Pull or Push patch", () => {
+  const { r, out } = loadRouter(2);                                        // restored: Saw, Active on
+  const set = () => out.filter((o) => o[0] === 1 && o[1] === "setactive").map((o) => o[2]);
+  r.msg("wave", 5);  assert.deepEqual(set(), [0], "Off -> Active off");
+  r.msg("active", 0); out.length = 0;                                      // (the Active parameter answers)
+  r.msg("wave", 1);  assert.deepEqual(set(), [1], "a waveform -> Active on");
+  r.msg("active", 1); out.length = 0;
+  r.msg("wave", 2);  assert.deepEqual(set(), [], "already on: nothing");
+  r.msg("active", 0); out.length = 0;
+  assert.deepEqual(set(), [], "the Active button does not touch the waveform");
+  r.msg("quiet"); r.msg("wave", 5); r.msg("quiet", -1);                    // Pull of a patch with wave 0 (Robin): shown as it is
+  assert.deepEqual(set(), []);
+  r.msg("active", 1); r.sendall();
+  assert.deepEqual(set(), [], "Push patch sends Off + Active as they are");
+});

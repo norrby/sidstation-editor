@@ -246,8 +246,9 @@ const noteName = (n) => NOTE_NAMES[n % 12] + (Math.floor(n / 12) - 2);
 const B7 = [0x7f, 0], B4 = [0x0f, 0];
 const OSC = [
   { key: "active",     name: "Active",        short: "Active", cc: [24, 25, 26], dumpOff: null, min: 0, max: 1, unit: "bool", init: 1 },
-  { key: "wave",       name: "Wave",          short: "Wave",   dumpOff: 15, dp: [0x0f, 4], min: 0, max: 4, unit: "enum",
-    labels: ["Tri", "Saw", "Pulse", "Mixed", "Noise"], codes: [1, 2, 4, 5, 8], init: 2 },
+  { key: "wave",       name: "Wave",          short: "Wave",   dumpOff: 15, dp: [0x0f, 4], min: 0, max: 5, unit: "enum",
+    // Off (code 0): no waveform selected in the SID, a silent oscillator (some patches have it). Last, so saved sets keep their index.
+    labels: ["Tri", "Saw", "Pulse", "Mixed", "Noise", "Off"], codes: [1, 2, 4, 5, 8, 0], init: 2 },
   { key: "pwsync",     name: "PWM Sync",      short: "PW Sync", dumpOff: 0, dp: [0x01, 0], min: 0, max: 1, unit: "bool", init: 1 },
   { key: "gate",       name: "Gate",          short: "Gate",   dumpOff: 0,  dp: [0x01, 1], min: 0, max: 1, unit: "bool", init: 0 },
   { key: "pbrange",    name: "PB Range",      short: "PB",     dumpOff: 5,  dp: B7, min: 0, max: 24, unit: "semitones", init: 2 },
@@ -497,6 +498,17 @@ const midiIn = midiParser({
     if (st === 0x9 || st === 0x8) outlet(1, "note", st === 0x9 && m[2] > 0 ? 1 : 0);
   },
 });
+// Choosing a waveform turns the oscillator on, choosing Off turns it off (Active): Off alone leaves the SID's gate and envelope
+// running (R33 writes the wave byte straight to the control register), Active off clears the whole control register ($8B05,
+// $9859) – silent, and the oscillator still runs as a sync/ring source. Only for a change made now: never on load or Pull (both
+// return before this), never for Push patch (same value), and the Active button does not change the waveform.
+const WAVE_OFF = SidParams.OSC.find((d) => d.key === "wave").labels.indexOf("Off");
+function followWave(v) {
+  const want = v === WAVE_OFF ? 0 : 1;
+  if (val.active === want) return;
+  sidlog("osc" + osc, "wave", v === WAVE_OFF ? "Off -> Active off" : "chosen -> Active on");
+  outlet(1, "setactive", want);
+}
 let lastPushCC = -Infinity;
 function pushCC(v) {
   if (!(v > 0)) return;
@@ -534,7 +546,7 @@ function param(key, v) {
   v = Math.round(Number(v));
   if (!Number.isFinite(v)) { sidlog("osc" + osc, "invalid value", key, JSON.stringify(raw)); return; }
   v = Math.max(d.min, Math.min(d.max, v));
-  const first = !(key in val);
+  const first = !(key in val), prev = val[key];
   val[key] = v;
   // In the SID, ring modulation only acts on the triangle wave: Tri (0) and Mixed (3, Tri+Pulse). Outlet 1 ->
   // the Ring button (active 0/1) and the overview, regardless of arming.
@@ -543,6 +555,7 @@ function param(key, v) {
   // to the synth, whenever it arrives (once it came after "armed" and 155 values overwrote the synth's edit buffer).
   if (first) { if (armed) sidlog("osc" + osc, "first value kept, not sent:", key, v); return; }
   if (muted()) return;
+  if (key === "wave" && v !== prev) followWave(v);
   if (viaCC(d, v)) { sendCC(SidParams.oscCC(osc, d), SidParams.toCC(v, d.min, ccMax(d))); return; }
   const r = SidParams.oscDP(osc, d);
   if (!r) { sidlog("osc" + osc, key, "has neither CC nor DP"); return; }
