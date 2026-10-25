@@ -7,6 +7,8 @@
 //   mode 2 (the overview): the same without the divider.
 // Lies behind everything (sendtoback) and ignores clicks; the layout engine sets its rect and sends the shape.
 // In: shape <numbers…> (lib/layout.js voiceShape)
+//     hilite <row> <0|1>  frame row <row> (0 osc, 1 env, 2 tbl) and its panel, if open, in the accent colour: where a note points
+//                         (sid.tablenote.js, while the mouse is over it)
 
 mgraphics.init();
 mgraphics.relative_coords = 0;
@@ -20,7 +22,7 @@ const RAINBOW = [[0.86, 0.2, 0.18, 1], [0.95, 0.52, 0.16, 1], [0.97, 0.82, 0.25,
 const COLOURS = [[0.36, 0.56, 0.9, 0.34], [0.38, 0.78, 0.46, 0.34], [0.96, 0.66, 0.24, 0.34], [0.66, 0.46, 0.92, 0.34],   // osc/env/tbl, LFO
   [0.85, 0.87, 0.92, 0.26]];                                                                                                  // the overview (SHADE.halo)
 const R = 6, FILLET = 5;
-let sh = null;
+let sh = null, hiliteRow = -1;
 
 // Rounded rectangle, clockwise (all subpaths clockwise, so overlapping ones fill as a union).
 function rr(x, y, w, h, c) {
@@ -108,14 +110,27 @@ function paintColour(s, w, h, withDivider) {
   }
 }
 
+// The highlighted row: a 2 px frame round its label in the column (up to the body's edge) and round its panel's halo when open.
+function paintHilite(s) {
+  const r = s.rows[hiliteRow], g = mgraphics;
+  if (!r) return;
+  g.set_source_rgba(UI.peak); g.set_line_width(2);
+  rr(r.x - 2, r.y - 3, s.bodyX - 4 - (r.x - 2), r.h + 6, [4, 4, 4, 4]); g.stroke();
+  if (r.open && r.target >= 0 && r.target < s.subs.length) {
+    const b = s.subs[r.target];
+    rr(b.x - 4, s.iy0 - 4, b.w + 8, s.iy1 - s.iy0 + 8, [R, R, R, R]); g.stroke();
+  }
+}
 function paint() {
   const s = parse();
   if (!s) return;
   const w = mgraphics.size[0], h = mgraphics.size[1];
   if (s.mode === 1 || s.mode === 2) paintColour(s, w, h, s.mode === 1);   // 2: no divider (the overview, first)
+  if (hiliteRow >= 0) paintHilite(s);
 }
+function hilite(row, on) { hiliteRow = Number(on) ? Number(row) : -1; mgraphics.redraw(); }
 function shape() { sh = arrayfromargs(arguments).map(Number); sidlog("voicebg", "shape", sh.slice(0, 7).join(" "), "open", (parse().rows.map((r) => r.open).join(""))); mgraphics.redraw(); }
 function onresize() { mgraphics.redraw(); }
 
-paint = sidguard("voicebg", paint); shape = sidguard("voicebg", shape);
+paint = sidguard("voicebg", paint); shape = sidguard("voicebg", shape); hilite = sidguard("voicebg", hilite);
 sidlog("voicebg", "loaded");

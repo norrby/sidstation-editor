@@ -47,6 +47,7 @@ const TABLE_FRAME = [0, INNER_Y, TABLE_W, INNER_H], TABLE_TITLE = [PAD, TITLE_Y,
 const TBLFOLD_RECT = [X.btn + 16, 54, 18, 18], TBL_LABEL = [X.btn + 36, 55, 24, 15];   // the third fold row, right below env
 const ENV_FRAME = [0, INNER_Y, ENV_W, INNER_H], VOICE_FRAME = [0, FRAME_Y, COL_PW + PAD, FRAME_H];   // the width is set by the layout engine
 const TITLES = { osctitle: ["Oscillator", [X.wave, TITLE_Y, 100, 15]] };   // gets the number in oscPanel
+const TBL_NOTE = [X.wave + 68, TITLE_Y + 1, 124, 14];                         // "(using waveform table)" after the title, while Table Speed > 0
 // Section brackets "──── Waveform ────" (sid.section.js): [full rect, compact rect | null]
 const SECTIONS = { wavetitle: ["Waveform", [X.wave, SUB_Y, X.det + 204 - X.wave, 13], [X.wave, SUB_Y, 40, 13]], tonetitle: ["Tone", [X.pitch, SUB_Y, 188, 13], null] };
 const ENV_TITLE = [X.env, TITLE_Y, 100, 15], ENV_SECTION = [X.env, SUB_Y, 224, 13];
@@ -58,7 +59,7 @@ function oscItems(pre) {
   const items = [];
   const add = (name, rect, flags = {}) => items.push({ name: pre + name, rect, ...flags });
   add("oscframe", OSC_FRAME.full, { compact: OSC_FRAME.compact });
-  add("osctitle", TITLES.osctitle[1]); add("wavetitle", SECTIONS.wavetitle[1], { compact: SECTIONS.wavetitle[2] }); add("tonetitle", SECTIONS.tonetitle[1], { shift: true }); add("viblabel", VIB_LABEL, { shift: true });
+  add("osctitle", TITLES.osctitle[1]); add("tblnote", TBL_NOTE, { when: "tblon" }); add("wavetitle", SECTIONS.wavetitle[1], { compact: SECTIONS.wavetitle[2] }); add("tonetitle", SECTIONS.tonetitle[1], { shift: true }); add("viblabel", VIB_LABEL, { shift: true });
   add("wave", rectOf("wave"));
   add("pulse", PULSE_RECT, { when: "pulse" });
   for (const k of PULSE_KEYS) add(k, rectOf(k), { when: k === "pwlfo" ? ["pulse", "pwlfo"] : "pulse" });
@@ -112,7 +113,13 @@ function oscPanel(n, cx0, ctx) {
   );
   boxes.unshift(frameBox(id(), pre + "oscframe", px(OSC_FRAME.full), SHADE.inner), frameBox(id(), pre + "envframe", pe(ENV_FRAME), SHADE.inner));   // sub-panels
   boxes.unshift(frameBox(id(), pre + "tableframe", pt(TABLE_FRAME), SHADE.inner));
-  boxes.unshift(voiceFrame(id(), pre + "voiceframe", pc([0, FRAME_Y, COL_PW + VOICE_GAP + OSC_W + VOICE_GAP + ENV_W + VOICE_GAP + TABLE_W + PAD, FRAME_H]), ));   // the voice behind them
+  const vBg = id();
+  boxes.unshift(voiceFrame(vBg, pre + "voiceframe", pc([0, FRAME_Y, COL_PW + VOICE_GAP + OSC_W + VOICE_GAP + ENV_W + VOICE_GAP + TABLE_W + PAD, FRAME_H]), ));   // the voice behind them
+  // "(using waveform table)" after the oscillator's title while Table Speed > 0 (the layout shows it); hovering frames the tbl row (row 2)
+  // and the table panel in the voice's background
+  const vTblNote = id(), vTblNotePre = id();
+  boxes.push(v8ui(vTblNote, "sid.tablenote.js", [1200, py + 460, 124, 14], px(TBL_NOTE), pre + "tblnote"), A.obj(vTblNotePre, "prepend hilite 2", [1200, py + 490, 100, 20]));
+  lines.push(A.line(vTblNote, 0, vTblNotePre, 0), A.line(vTblNotePre, 0, vBg, 0));
   // the waveform table: widget -> [route bytes] -> [prepend table] -> the router (changed rows as DP); sid.load.js sends "bytes …" to it
   const vTable = id(), vTableRoute = id(), vTablePre = id();
   boxes.push(titleBox(id(), pre + "tabletitle", "Table " + n, pt(TABLE_TITLE)), A.comment(id(), "OFF", [1000, py + 210, 44, 15], pt(TABLE_OFF), { varname: pre + "tableoff", fontsize: 10, fontface: 1, textjustification: 1 }),

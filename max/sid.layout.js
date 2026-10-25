@@ -6,7 +6,7 @@
 //      show <n> <0|1>     expand/collapse osc n (collapsed = only number and fold button)
 //      env <n> <0|1>      show/hide the envelope panel for osc n
 //      table <n> <0|1>    show/hide the waveform table panel for osc n (collapsed by default)
-//      tblspeed <n> <v>   Table Speed of osc n (0 = table off: its row dashed, the label dimmed)
+//      tblspeed <n> <v>   Table Speed of osc n (0 = table off: its row dashed, the label dimmed; above 0: the note after "Oscillator n")
 //      fold <n> <0|1>     like show, inverted
 //      lfosel <0..3>      the LFO selector (live.tab "LFO Select"): only that LFO's sub-panel shows
 //      lfoshow <0|1>      the LFO section's fold button: 0 = only the column
@@ -42,7 +42,7 @@ function key(n) { return typeof n === "number" ? "o" + n : String(n); }
 function env(n, v) { const s = state[key(n)]; if (!s) return; s.env = v ? 1 : 0; sidlog("layout", "env", n, s.env); relayout(false); }
 function table(n, v) { const s = state[key(n)]; if (!s) return; s.table = v ? 1 : 0; sidlog("layout", "table", n, s.table); relayout(false); }
 // tblspeed <n> <speed>: Table Speed of osc n; 0 = the table is off -> its fold row is drawn dashed and the "tbl" label dimmed
-function tblspeed(n, v) { const s = state["o" + n]; if (!s) return; s.tbloff = Number(v) > 0 ? 0 : 1; relayout(false); }
+function tblspeed(n, v) { const s = state["o" + n]; if (!s) return; s.tbloff = Number(v) > 0 ? 0 : 1; s.tblon = 1 - s.tbloff; relayout(false); }
 // poly <v>: Poly mode swaps osc 1's Active for its always-on stand-in (o1_activepoly)
 function poly(v) { const s = state.o1; if (!s) return; s.poly = v ? 1 : 0; s.single = 1 - s.poly; sidlog("layout", "poly", s.poly); relayout(false); }
 // glide <v>: some oscillator has Portamento > 0; without it Legato does nothing and its greyed stand-in is shown (c_legatodim)
