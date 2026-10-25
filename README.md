@@ -33,6 +33,9 @@ Not affiliated with or endorsed by Elektron. Use at your own risk.
   store support (see below). With the stock OS the synth does not answer, and the editor shows
   **NO REPLY**.
 - Every value is a Live parameter: automation, MIDI mapping and presets work as usual.
+- **Push 2:** every parameter in banks, and the waveform tables edited step by step (see Push below).
+- **"(using waveform table)"** after an oscillator's title shows that the table, not the Wave switch, sets
+  its waveform. The Info View explains, and holding the mouse over the note points out the table.
 
 <img src="docs/images/oscillator.png" alt="Overview and oscillator 1 with pulse width" width="785">
 
@@ -83,6 +86,28 @@ One MIDI track does everything:
 
 If the synth's MIDI In light blinks but replies never reach the editor, Live may have lost the
 input port: restart Live.
+
+## Push
+
+With a Push 2 (or 3) the device shows its parameters in banks: **Main** (filter and the three
+oscillators' waveforms), **Patch**, **Filter**, **Filter Env**, four per oscillator (**Osc1**, **Osc1 Env**,
+**Osc1 Mod**, **Osc1 Table**) and two per LFO. The one-shot buttons (Push, Pull and Store patch) are kept
+off Push, so a stray touch never sends or stores a patch. The patch name is the device name in Push's
+header.
+
+**Osc1 Table** edits oscillator 1's waveform table on Push, one step at a time, with what you do
+appearing in the table on screen and going to the synth as a click there would:
+
+| Knob | |
+|---|---|
+| **Step** | the step being edited; it stops at the table's last step |
+| **Wave** | Tri, Saw, Pulse, Mix, Noise, Off, or Keep (the waveform stays as it was) |
+| **Mod** | None, Sync, Ring or S+R |
+| **Pitch** | Keep, Fixed or Relative; the next knob follows: |
+| **Note** / **Offset** | the fixed note, or the offset in semitones |
+| **Length** | the number of steps, 0–65 |
+| **Loop** | Once or Loop; switching to Loop loops to the last step and shows **Loop To** in the next slot until another knob is turned |
+| **Speed** / **Loop To** | the table's speed (0 = off), or the step the loop goes back to |
 
 ## Safety
 
