@@ -98,12 +98,14 @@ sends to the synth only through one gateway (`max/sid.send.js`):
 
 ## Data folders
 
-Max cannot create folders, so these are used only if you create them:
+Max cannot create folders, so these are used only if you create them in your home folder:
 
 | Folder | What |
 |---|---|
-| `~/Documents/SidStation/dumps` | every patch dump received is saved here as `.syx` |
-| `~/Library/Logs/SidStation` | `max.log`, a log for troubleshooting (everything also goes to the Max console) |
+| `Documents/SidStation/dumps` | every patch dump received is saved here as `.syx` |
+| `Library/Logs/SidStation` (macOS), `Documents/SidStation/logs` (Windows) | `max.log`, a log for troubleshooting (everything also goes to the Max console) |
+
+On Windows the home folder is `C:\Users\<name>`; this has not been tried on Windows yet.
 
 ## Firmware
 
@@ -121,6 +123,9 @@ node tools/sid.js request 127                             # dump request (needs 
 ```
 
 ## Development
+
+How the device works, from the big picture down: [docs/architecture.md](docs/architecture.md). Where to start
+reading the code: [docs/reading-guide.md](docs/reading-guide.md).
 
 ```
 npm run build    # generates dist/ (devices + bundled scripts) from build/, lib/ and max/
