@@ -179,7 +179,7 @@ test("SidStation (one track): no global bus; midiout is fed only by the built-in
 test("SidStation: Push banks of 8 by long name; no show/hide tabs, table data, name letters or patch buttons", () => {
   const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", NAME + ".amxd")).json.patcher;
   const banks = Object.values(p.parameters.parameterbanks);
-  assert.equal(banks.length, 21);
+  assert.equal(banks.length, 24);
   assert.deepEqual(banks.map((b) => b.index), banks.map((_, i) => i));
   const longs = new Set(p.boxes.map((b) => b.box.saved_attribute_attributes && b.box.saved_attribute_attributes.valueof && b.box.saved_attribute_attributes.valueof.parameter_longname).filter(Boolean));
   for (const b of banks) {
@@ -197,5 +197,34 @@ test("SidStation: every live.text shows its parameter's values in Live and on Pu
   for (const { box: b } of p.boxes.filter((x) => x.box.maxclass === "live.text")) {
     const e = b.saved_attribute_attributes.valueof.parameter_enum;
     assert.deepEqual([b.automation, b.automationon], e, b.varname);
+  }
+});
+
+test("SidStation: the Push table knobs are visible on Push only (not automated, no initial output, no presentation) and wired to the table", () => {
+  const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", NAME + ".amxd")).json.patcher;
+  const { PUSH_VISIBLE } = require("../build/station/common");
+  const byVar = (v) => p.boxes.find((b) => b.box.varname === v);
+  const text = (id) => (p.boxes.find((b) => b.box.id === id) || { box: {} }).box.text;
+  const from = (id) => p.lines.filter((l) => l.patchline.source[0] === id).map((l) => l.patchline.destination[0]);
+  for (const n of [1, 2, 3]) {
+    const table = byVar("o" + n + "_table").box.id;
+    for (const key of ["step", "wave", "mod", "pitch", "note", "offset", "len", "loop", "target"]) {
+      const b = byVar("o" + n + "_push" + key), vo = b.box.saved_attribute_attributes.valueof;
+      assert.equal(vo.parameter_invisible, PUSH_VISIBLE, vo.parameter_longname);
+      assert.equal(vo.parameter_initial_enable, 0, vo.parameter_longname);
+      assert.ok(!b.box.presentation, vo.parameter_longname + " is not on screen");
+      const pre = from(b.box.id);
+      assert.equal(pre.length, 1); assert.equal(text(pre[0]), "prepend push " + key);
+      assert.deepEqual(from(pre[0]), [table], vo.parameter_longname + " -> the table");
+    }
+    const bi = Object.values(p.parameters.parameterbanks).findIndex((b) => b.name === "Osc" + n + " Table");
+    assert.deepEqual(Object.values(p.parameters.parameterbanks)[bi].parameters,
+      ["Step", "Wave", "Mod", "Pitch", "Note", "Length", "Loop", "Speed"].map((k) => "Osc " + n + " Table " + k));
+    assert.equal(Object.values(p.parameters.parameterbanks)[bi].buttons, undefined, "no buttons in the saved bank (crashed Live)");
+    // Note/Offset and Loop To swaps: the widget's "bank"/"bankloop" -> [route] -> [sel 0 1] -> the edit messages -> [live.banks]
+    const msgs = p.boxes.filter((b) => b.box.maxclass === "message" && (b.box.text || "").startsWith("edit " + bi + " ")).map((b) => b.box.text).sort();
+    assert.deepEqual(msgs, ["edit " + bi + " - 4 \"Osc " + n + " Table Note\"", "edit " + bi + " - 4 \"Osc " + n + " Table Offset\"", "edit " + bi + " - 7 \"Osc " + n + " Table Loop To\"", "edit " + bi + " - 7 \"Osc " + n + " Table Speed\""].sort());
+    const banksBox = p.boxes.filter((b) => b.box.text === "live.banks");
+    assert.equal(banksBox.length, 3);
   }
 });

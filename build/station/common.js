@@ -32,7 +32,14 @@ function live(id, cls, rect, pres, vo, extra = {}, varname = vo.parameter_longna
     patching_rect: rect, ...(pres ? { presentation: 1, presentation_rect: pres } : {}),
     varname, saved_attribute_attributes: { valueof: vo }, ...shown, ...extra } };
 }
-const UNIT = { int: 0, semitones: 7 };
+const UNIT = { int: 0, semitones: 7, note: 8 };
+// parameter_invisible: 0 automated and stored, 1 stored only, 2 hidden. Max 9.1 (Live 12.4) adds two modes that show a parameter on
+// Push without automation: 3 visible (stored), 4 visible (not stored). The numbers are not in the reference; both were tried in
+// Live 12.4.7: the table bank (PUSH_TABLE) shows on Push with either, but with 4 Live never takes a value the patcher gives the
+// knob (Push kept counting from its own value), so the knobs are stored (3), which costs nothing: they hold the cursor and its step.
+// 3 behaved the same. So the knobs are ordinary automated parameters (0) for now: Live then follows a value the patcher gives the
+// knob, at the price of 24 entries in the automation list.
+const PUSH_VISIBLE = 0;
 function valueof(d, longPrefix) {
   // d.push: the name Push shows, where it differs from the label in the device (a name Push has images for)
   const vo = { parameter_longname: longPrefix + d.name, parameter_shortname: d.push || d.short, parameter_modmode: 0, parameter_initial_enable: 1, parameter_initial: [d.init] };
@@ -65,4 +72,4 @@ function actionButton(boxId, rect, pres, longname, text, varname) {
     { text, texton: text, mode: 0, fontsize: 9 }, varname);
 }
 
-module.exports = { PAD, GAP, FRAME_Y, FRAME_H, DIAL, COL_W, VOICE_GAP, COL_PW, INNER_Y, INNER_H, FCOL_W, ENV_DIAL_Y, TITLE_Y, SUB_Y, CONTENT_Y, DEVICE_H, voiceFrameItem, live, valueof, v8ui, plain, SHADE, frameBox, voiceFrame, titleBox, shifted, actionButton };
+module.exports = { PUSH_VISIBLE, UNIT, PAD, GAP, FRAME_Y, FRAME_H, DIAL, COL_W, VOICE_GAP, COL_PW, INNER_Y, INNER_H, FCOL_W, ENV_DIAL_Y, TITLE_Y, SUB_Y, CONTENT_Y, DEVICE_H, voiceFrameItem, live, valueof, v8ui, plain, SHADE, frameBox, voiceFrame, titleBox, shifted, actionButton };

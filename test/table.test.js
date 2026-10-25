@@ -12,10 +12,10 @@ function loadWidget() {
   for (const f of ["set_source_rgba", "rectangle", "fill", "set_line_width", "move_to", "line_to", "stroke", "close_path", "select_font_face", "set_font_size", "show_text", "arc", "ellipse"]) mg[f] = () => {};
   mg.set_source_rgba = (...a) => inks.push([].concat(...a));
   const g = { UI, sidlog: (...a) => logs.push(a.join(" ")), sidguard, mgraphics: mg, post() {}, outlet: (o, ...a) => out.push([].concat(...a).join(" ")), arrayfromargs: (a) => Array.from(a),
-    messagename: "", Task: class { constructor(fn) { this.fn = fn; this.running = false; } repeat() { this.running = true; } cancel() { this.running = false; } } };
+    messagename: "", Task: class { constructor(fn) { this.fn = fn; this.running = false; } repeat() { this.running = true; } cancel() { this.running = false; } schedule() {} } };
   const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.table.js"), "utf8")
     .replace(/^inlets = 1;\noutlets = 1;\n/m, "").replace("const born = Date.now();", "const born = 0;");
-  const fn = new Function(...Object.keys(g), src + "\nreturn { geom, paint, onclick, ondrag, bytes, bang, encode, clear, loopmode, note, tick, rate, speed: (v) => { messagename = 'speed'; anything(v); }, get play() { return play; }, get running() { return ticker.running; }, get n() { return n; }, get term() { return term; }, get steps() { return steps; } };");
+  const fn = new Function(...Object.keys(g), src + "\nreturn { geom, paint, onclick, ondrag, bytes, bang, encode, clear, loopmode, note, tick, rate, speed: (v) => { messagename = 'speed'; anything(v); }, get play() { return play; }, get running() { return ticker.running; }, get n() { return n; }, get term() { return term; }, get steps() { return steps; }, push, get cursor() { return cursor; } };");
   return { w: fn(...Object.values(g)), out, logs, inks };
 }
 const last = (out) => out.filter((s) => s.startsWith("bytes")).pop();
@@ -165,4 +165,57 @@ test("Clear, then steps, then Loop: the target is a real step (it once went out 
   w.loopmode(1);
   const b = w.encode();
   assert.deepEqual(b.slice(-2), [0xfe, 0], "Loop to step 0, not FF");
+});
+
+// --- Push: the table step by step from the "Osc n Table" bank ----------------------------------------------------------
+const knob = (out, key) => out.filter((s) => s.startsWith("knob " + key + " ")).pop();
+
+// Every knob's first value is Live's restore on load and is never applied (also before the table is restored, so a real table is safe).
+const KEYS = ["step", "wave", "mod", "pitch", "note", "offset", "len", "loop", "target"];
+const restore = (w) => { for (const k of KEYS) w.push(k, 0); };
+
+test("push: the first value per knob (the restore on load) is kept, not applied; then the step under the cursor is edited and the table goes out as after a click", () => {
+  const { w, out, logs } = loadWidget();
+  w.bytes(0x10, 0x3c, 0x20, 0xff, 0xff);                                   // Tri F60, Saw ---, End
+  restore(w);                                                                // what Live sends on load, after the table was restored
+  assert.equal(logs.filter((l) => /first value .* kept/.test(l)).length, KEYS.length);
+  assert.equal(w.n, 2); assert.equal(last(out), "bytes 16 60 32 255 255", "the table is untouched");
+  w.bytes(0x10, 0x3c, 0x20, 0xff, 0xff);
+  assert.deepEqual([knob(out, "step"), knob(out, "wave"), knob(out, "pitch"), knob(out, "note"), knob(out, "len")], ["knob step 0", "knob wave 0", "knob pitch 1", "knob note 60", "knob len 2"]);
+  const tables = () => out.filter((s) => s.startsWith("bytes")).length, nb = tables();
+  w.push("step", 1);                                                        // the knobs that differ from step 0 follow; Step itself is not echoed
+  assert.deepEqual([knob(out, "step"), knob(out, "wave"), knob(out, "pitch")], ["knob step 0", "knob wave 1", "knob pitch 0"]);
+  assert.equal(tables(), nb, "moving the cursor sends no table");
+  w.push("wave", 4); w.push("mod", 1); w.push("offset", -5);
+  assert.deepEqual([w.steps[1].wave, w.steps[1].sync, w.steps[1].mode, w.steps[1].rel], [4, 1, "rel", -5]);
+  assert.equal(last(out), "bytes 16 60 130 133 255");                      // 82 = Noise + sync, 85 = subtract 5
+  assert.equal(knob(out, "pitch"), "knob pitch 2");                          // the pitch knob followed the offset
+  assert.deepEqual(out.filter((s) => s.startsWith("bank ")), ["bank 0", "bank 1"], "the slot after Pitch: Note at first, Offset once the step is relative");
+  w.push("note", 48); assert.deepEqual([w.steps[1].mode, w.steps[1].fixed], ["F", 48]); assert.equal(last(out), "bytes 16 60 130 48 255");
+  w.push("pitch", 0); assert.equal(last(out), "bytes 16 60 130 255 255");
+});
+
+test("push: Length grows and shrinks the table, keeps Loop below 65 and clamps the cursor's edits to the table", () => {
+  const { w, out, logs } = loadWidget();
+  restore(w);
+  w.bytes(0x10, 0x3c, 0xfe, 0x00);
+  w.push("len", 3); assert.equal(w.n, 3); assert.equal(last(out), "bytes 16 60 16 255 16 255 254 0");   // new steps: Tri ---
+  w.push("len", 65); assert.equal(w.n, 64, "a looping table keeps room for the command");
+  w.push("len", 0); assert.equal(w.term, "end"); assert.equal(last(out), "bytes 255");
+  w.push("loop", 1); assert.equal(w.term, "end", "an empty table cannot loop"); assert.equal(knob(out, "loop"), "knob loop 0");
+  w.push("len", 2); w.push("loop", 1); assert.equal(last(out), "bytes 16 60 16 255 254 1", "steps keep their content when the table grows back; switching on loops to the last step");
+  assert.equal(knob(out, "target"), "knob target 1"); assert.equal(out.filter((s) => s.startsWith("bankloop")).pop(), "bankloop 1", "Loop To shows");
+  w.push("mod", 3); assert.equal(last(out), "bytes 22 60 16 255 254 1");                                                     // 22 = Tri + ring + sync
+  assert.equal(out.filter((s) => s.startsWith("bankloop")).pop(), "bankloop 0", "another knob was turned: Speed is back");
+  w.push("loop", 1); assert.equal(out.filter((s) => s.startsWith("bankloop")).pop(), "bankloop 1", "Loop turned while looping: Loop To again");
+  w.push("target", 0); assert.equal(last(out), "bytes 22 60 16 255 254 0");
+  w.push("target", 9); assert.equal(last(out), "bytes 22 60 16 255 254 1", "the target stays inside the table"); assert.equal(knob(out, "target"), "knob target 1");
+  w.push("loop", 0); assert.equal(last(out), "bytes 22 60 16 255 255"); assert.equal(out.filter((s) => s.startsWith("bankloop")).pop(), "bankloop 0", "Loop To hides");
+  w.push("loop", 1); assert.equal(last(out), "bytes 22 60 16 255 254 1", "on again: the last step, not the old target");
+  w.push("loop", 0); assert.equal(last(out), "bytes 22 60 16 255 255");
+  w.push("len", 0);
+  w.push("step", 5); w.push("wave", 1);
+  assert.ok(logs.some((l) => /beyond the table/.test(l))); assert.equal(last(out), "bytes 255");
+  w.push("len", 10); w.push("step", 99); assert.equal(w.cursor, 9, "Step stops at the last step"); assert.equal(knob(out, "step"), "knob step 9");
+  w.push("len", 4); assert.equal(w.cursor, 3, "the cursor follows a shorter table"); assert.equal(knob(out, "step"), "knob step 3");
 });

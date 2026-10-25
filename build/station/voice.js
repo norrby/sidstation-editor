@@ -13,6 +13,26 @@ X.env = PAD;                                                   // ADSR/Gate rela
 // The waveform table panel (a table editor per voice): Speed dial on the left, the sid.table.js widget
 // (65 steps, 16 visible) to its right; a third fold button "tbl" in the column, collapsed by default.
 const TABLE_WIDGET_W = 576;
+// Push edits the table step by step from the "Osc n Table" bank (build/station/banks.js): eight hidden parameters, shown on Push but
+// not automated (PUSH_VISIBLE, Live 12.4). key = the widget's message (sid.table.js push/knob), name = on Push.
+const { PUSH_VISIBLE, UNIT } = require("./common");
+const { BANKS } = require("./banks");
+const PUSH_TABLE = [
+  { key: "step", name: "Step", cls: "live.numbox", vo: { parameter_type: 1, parameter_mmin: 0, parameter_mmax: 64, parameter_unitstyle: UNIT.int } },
+  { key: "wave", name: "Wave", cls: "live.menu", vo: { parameter_type: 2, parameter_enum: ["Tri", "Saw", "Pulse", "Mix", "Noise", "Off", "Keep"], parameter_mmax: 6 } },   // "Keep" = the panel's "---": Max replaces "---" with the instance number
+  { key: "mod", name: "Mod", cls: "live.menu", vo: { parameter_type: 2, parameter_enum: ["None", "Sync", "Ring", "S+R"], parameter_mmax: 3 } },   // as the widget's mod button
+  { key: "pitch", name: "Pitch", cls: "live.menu", vo: { parameter_type: 2, parameter_enum: ["Keep", "Fixed", "Relative"], parameter_mmax: 2 } },
+  // the fixed note as a list of names (Push shows no note names for a unit style): index = the synth's F n, which sounds as MIDI n + 12
+  { key: "note", name: "Note", cls: "live.menu", vo: { parameter_type: 2, parameter_enum: Array.from({ length: 82 }, (_, i) => P.noteName(i + 12)), parameter_mmax: 81 } },
+  { key: "offset", name: "Offset", cls: "live.numbox", vo: { parameter_type: 1, parameter_mmin: -47, parameter_mmax: 47, parameter_unitstyle: UNIT.semitones } },
+  { key: "len", name: "Length", cls: "live.numbox", vo: { parameter_type: 1, parameter_mmin: 0, parameter_mmax: 65, parameter_unitstyle: UNIT.int } },
+  { key: "loop", name: "Loop", cls: "live.menu", vo: { parameter_type: 2, parameter_enum: ["Once", "Loop"], parameter_mmax: 1 } },
+  // the loop's target step, in Speed's slot while the table loops (bankloop below); switching Loop on starts at the last step
+  { key: "target", name: "Loop To", cls: "live.numbox", vo: { parameter_type: 1, parameter_mmin: 0, parameter_mmax: 63, parameter_unitstyle: UNIT.int } },
+];
+// Note and Offset share the slot after Pitch (banks.js lists Note): the widget says "bank 0|1" when the step's pitch mode changes,
+// and [live.banks] is told to put Note or Offset there (edit <bank> - <slot> <name>; a quoted name is one symbol).
+const PUSH_SLOT = 4, PUSH_LOOP_SLOT = 7;
 const TABLE_W = PAD + 44 + GAP + TABLE_WIDGET_W + PAD;
 const WAVE_COMPACT_W = 60;                                     // the "Waveform" title must fit
 const SHIFT = X.pitch - (X.wave + WAVE_COMPACT_W + GAP);       // offset when the pulse group is hidden
@@ -138,6 +158,33 @@ function oscPanel(n, cx0, ctx) {
     A.obj(vClrSel, "route bang", [1300, py + 185, 60, 20]), A.obj(vClrSel1, "sel 1", [1360, py + 185, 40, 20]), A.msg(vClrMsg, "clear", [1300, py + 210, 40, 20]));
   lines.push(A.line(vClr, 0, vClrSel, 0), A.line(vClrSel, 0, vClrMsg, 0), A.line(vClrSel, 1, vClrSel1, 0), A.line(vClrSel1, 0, vClrMsg, 0), A.line(vClrMsg, 0, vTable, 0));
   lines.push(A.line(vLoopBtn, 0, vLoopPre, 0), A.line(vLoopPre, 0, vTable, 0), A.line(vTable, 0, vLoopRoute, 0), A.line(vLoopRoute, 0, vLoopSet, 0), A.line(vLoopSet, 0, vLoopBtn, 0));
+  // The Push table bank (PUSH_TABLE): a knob -> [prepend push <key>] -> the widget, which edits the step under the cursor and sends the
+  // table as after a click; the widget -> "knob <key> <v>" -> [route knob] -> [route step wave …] -> the knob's inlet (a value, not
+  // "set": Live's value and Push follow only then; the knob's output comes back as "push", which the widget knows as its own echo).
+  const vKnobRoute = id(), vKnobKeys = id();
+  boxes.push(A.obj(vKnobRoute, "route knob", [1500, py + 160, 70, 20], 2, ["", ""]),
+    A.obj(vKnobKeys, "route " + PUSH_TABLE.map((k) => k.key).join(" "), [1500, py + 185, 400, 20], PUSH_TABLE.length + 1, new Array(PUSH_TABLE.length + 1).fill("")));
+  lines.push(A.line(vTable, 0, vKnobRoute, 0), A.line(vKnobRoute, 0, vKnobKeys, 0));
+  const vBanks = id(), vBankRoute = id(), vBankSel = id(), vBankNote = id(), vBankOffset = id(), bank = BANKS.findIndex(([name]) => name === "Osc" + n + " Table");
+  const vLoopSel = id(), vLoopNone = id(), vLoopTo = id();
+  boxes.push(A.obj(vBanks, "live.banks", [1500, py + 330, 70, 20], 1, [""]), A.obj(vBankRoute, "route bank bankloop", [1500, py + 240, 120, 20], 3, ["", "", ""]),
+    A.obj(vBankSel, "sel 0 1", [1500, py + 265, 60, 20], 3, ["bang", "bang", ""]),
+    A.msg(vBankNote, "edit " + bank + " - " + PUSH_SLOT + " \"" + longPre + "Table Note\"", [1500, py + 295, 180, 20]),
+    A.msg(vBankOffset, "edit " + bank + " - " + PUSH_SLOT + " \"" + longPre + "Table Offset\"", [1700, py + 295, 180, 20]),
+    A.obj(vLoopSel, "sel 0 1", [1900, py + 265, 60, 20], 3, ["bang", "bang", ""]),
+    // the last slot: Speed, or Loop To while the table loops
+    A.msg(vLoopNone, "edit " + bank + " - " + PUSH_LOOP_SLOT + " \"" + longPre + "Table Speed\"", [1900, py + 295, 180, 20]),
+    A.msg(vLoopTo, "edit " + bank + " - " + PUSH_LOOP_SLOT + " \"" + longPre + "Table Loop To\"", [2100, py + 295, 180, 20]));
+  lines.push(A.line(vTable, 0, vBankRoute, 0), A.line(vBankRoute, 0, vBankSel, 0), A.line(vBankSel, 0, vBankNote, 0), A.line(vBankSel, 1, vBankOffset, 0),
+    A.line(vBankNote, 0, vBanks, 0), A.line(vBankOffset, 0, vBanks, 0),
+    A.line(vBankRoute, 1, vLoopSel, 0), A.line(vLoopSel, 0, vLoopNone, 0), A.line(vLoopSel, 1, vLoopTo, 0), A.line(vLoopNone, 0, vBanks, 0), A.line(vLoopTo, 0, vBanks, 0));
+  PUSH_TABLE.forEach((k, i) => {
+    const vK = id(), vPre = id(), kx = 2300 + i * 100;
+    boxes.push(live(vK, k.cls, [kx, py + 240, 80, 18], null, { parameter_longname: longPre + "Table " + k.name, parameter_shortname: k.name,
+      parameter_modmode: 0, parameter_initial_enable: 0, parameter_invisible: PUSH_VISIBLE, parameter_visible_undoable: 0, ...k.vo }, { fontsize: 9 }, pre + "push" + k.key),   // no undo steps for the knobs: the table itself (a stored parameter) has them
+      A.obj(vPre, "prepend push " + k.key, [kx, py + 265, 90, 20]));
+    lines.push(A.line(vK, 0, vPre, 0), A.line(vPre, 0, vTable, 0), A.line(vKnobKeys, i, vK, 0));
+  });
   for (const [name, [text, rect]] of Object.entries(TITLES)) boxes.push(titleBox(id(), pre + name, name === "osctitle" ? "Oscillator " + n : text, px(rect)));
   boxes.push(titleBox(id(), pre + "envtitle", "Envelope " + n, pe(ENV_TITLE)));
   for (const [name, text, rect] of [["wavetitle", SECTIONS.wavetitle[0], px(SECTIONS.wavetitle[1])], ["tonetitle", SECTIONS.tonetitle[0], px(SECTIONS.tonetitle[1])], ["envsection", "ADSR", pe(ENV_SECTION)]]) {

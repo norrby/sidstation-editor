@@ -27,7 +27,18 @@
 //                   step 0 and a counter = speed; every tick the counter counts down, at 0 the next step (Loop jumps to its
 //                   target in the same tick, End or step 65 stops). So every step lasts exactly <speed> ticks. The synth does
 //                   not report its position – this is a simulation; it stops when no note is held.
-// Out: "steps n end|loop target" and "bytes …" on outlet 0 after every change (on mouse up while dragging).
+//      push <key> <v>   from the Push bank's knobs (build/station/voice.js PUSH_TABLE): step = the cursor (0..64), len = the
+//                   table's length (0..65), loop 0|1 (as loopmode; switching on loops to the last step), target = the loop's target step
+//                   (clamped to the table), and for the
+//                   step under the cursor wave 0..6, mod = sync | ring << 1 (as the mod button), pitch 0 --- | 1 fixed | 2 relative,
+//                   note = the fixed note F 0..81 (the knob's list of names), offset -47..47. A note or offset also sets the pitch mode.
+// Out: "steps n end|loop target" and "bytes …" on outlet 0 after every change (on mouse up while dragging), "knob <key> <v>"
+//      for every Push knob whose value should change, so they show the step under the cursor (the value goes INTO the knob, so
+//      that Live and Push follow – a silent "set" left Live's value behind – and comes straight back here as "push": the echo is
+//      told apart by a flag, as the patcher runs the chain synchronously), and "bank 0|1" when the step's pitch mode changes
+//      between fixed and relative: the bank then shows Note or Offset in the slot after Pitch (live.banks edit in the patcher);
+//      likewise "bankloop 0|1": the last slot shows Loop To right after the Loop knob switched the loop on, until another knob
+//      (not Loop To) is turned; otherwise Speed.
 
 mgraphics.init();
 mgraphics.relative_coords = 0;
@@ -66,6 +77,17 @@ let steps = [], n = 0, term = "end", target = 0;
 let speed = 0, rateHz = 120, held = 0, play = -1, cnt = 0, t0 = 0, done = 0;
 const ticker = new Task(pump, this);
 let drag = null, hover = -1, msg = "", off = 0;   // off: the first visible column
+// Push edits one step at a time, the one under the cursor. Every knob outputs a value when the device loads (Live's restore, as
+// with every live.* object, also for a parameter that is not stored), and that first value per knob is never applied: with a
+// table it would overwrite step 0 and set the length to 0. The same rule as the routers' (sid.osc.js param).
+let cursor = 0, bankShown = -1, bankLoopShown = -1;   // bankShown: 0 Note or 1 Offset in the bank; bankLoopShown: Loop To shown; -1 not told yet
+let loopToShown = false;                            // Loop To is in the bank: from a Loop turn that loops until another knob is turned
+const pushSeen = {}, knobVal = {};                 // knobVal: what each knob holds now (from Push or from knobs()), so only a change is sent
+let syncing = false;                               // knobs() is sending: what comes back is our own echo
+// Live's restore of the knobs comes after the table was restored and overwrites what knobs() had sent, so the knobs are sent again
+// shortly after the last first value has arrived (Live restores them one after another).
+const resync = new Task(() => knobs(), this);
+const PITCH_MODES = ["keep", "F", "rel"];
 
 function newStep() { return { wave: 0, sync: 0, ring: 0, mode: "keep", fixed: 48, rel: 0 }; }
 function reset() { steps = []; for (let i = 0; i < MAXCOL; i++) steps.push(newStep()); n = 0; term = "end"; target = 0; mgraphics.redraw(); }   // the smallest table: End alone, as in most factory patches
@@ -318,6 +340,54 @@ function ondblclick(x, y) {
 }
 function changed(quietWhileDragging) { mgraphics.redraw(); if (!(quietWhileDragging && drag)) out(); }
 
+// --- Push ------------------------------------------------------------------
+
+function push(key, v) {
+  v = Math.round(Number(v));
+  if (!Number.isFinite(v)) return;
+  if (syncing) return;                                                       // our own value coming back from the knob
+  knobVal[key] = v;
+  if (!pushSeen[key]) { pushSeen[key] = true; sidlog("table", "push " + key + ": first value " + v + " kept, not applied (the restore on load)"); resync.schedule(300); return; }
+  sidlog("table", "push", key, v);
+  if (key !== "loop" && key !== "target") loopToShown = false;             // any other knob: Speed is back
+  if (key === "step") { cursor = clamp(v, 0, Math.max(0, n - 1)); msg = describe(cursor); mgraphics.redraw(); knobs(); return; }   // not past the table: knobs() pushes the knob back
+  if (key === "len") {
+    n = clamp(v, 0, MAXCOL);
+    if (term === "loop") n = Math.min(n, MAXCOL - 1);                         // a full table has no room for the Loop command
+    if (n === 0) term = "end";
+    target = Math.max(0, Math.min(target, n - 1));
+    cursor = Math.min(cursor, Math.max(0, n - 1));                             // the cursor follows a shorter table
+    changed(); return;
+  }
+  if (key === "loop") { if (v && term !== "loop") target = MAXCOL; loopmode(v); loopToShown = term === "loop" && n < MAXCOL; knobs(); return; }   // switching on: the last step (loopmode clamps)
+  if (key === "target") { target = clamp(v, 0, Math.max(0, n - 1)); changed(); return; }
+  if (cursor >= n) { sidlog("table", "push " + key + ": step " + cursor + " is beyond the table's " + n + " steps, turn Length first"); knobs(); return; }
+  const s = steps[cursor];
+  if (key === "wave") s.wave = clamp(v, 0, WAVES.length - 1);
+  else if (key === "mod") { s.sync = v & 1; s.ring = (v >> 1) & 1; }
+  else if (key === "pitch") s.mode = PITCH_MODES[clamp(v, 0, 2)];
+  else if (key === "note") { s.mode = "F"; s.fixed = clamp(v, 0, 81); }
+  else if (key === "offset") { s.mode = "rel"; s.rel = clamp(v, -47, 47); }
+  else { post("sid.table: unknown push " + key + "\n"); return; }
+  msg = describe(cursor); changed();
+}
+// The knobs follow the step under the cursor: "knob <key> <v>" -> [prepend set] -> the hidden parameter, silently.
+function knobs() {
+  const s = steps[cursor];
+  syncing = true;
+  try {
+    for (const [k, v] of [["step", cursor], ["wave", s.wave], ["mod", s.sync | s.ring << 1], ["pitch", PITCH_MODES.indexOf(s.mode)],
+      ["note", clamp(s.fixed, 0, 81)], ["offset", s.rel], ["len", n], ["loop", term === "loop" && n < MAXCOL ? 1 : 0], ["target", target]]) {
+      if (knobVal[k] === v) continue;
+      knobVal[k] = v; outlet(0, "knob", k, v);
+    }
+  } finally { syncing = false; }
+  const slot = s.mode === "rel" ? 1 : 0;
+  if (slot !== bankShown) { bankShown = slot; outlet(0, "bank", slot); }
+  const lp = loopToShown ? 1 : 0;
+  if (lp !== bankLoopShown) { bankLoopShown = lp; outlet(0, "bankloop", lp); }
+}
+
 // --- data -----------------------------------------------------------------
 
 // A step read from the synth keeps its bytes and goes back unchanged until it is edited: Pull + Push gives the same table even
@@ -413,6 +483,7 @@ function out() {
   outlet(0, "steps", n, term, target);
   outlet(0, "loop", term === "loop" && n < MAXCOL ? 1 : 0);              // -> the button
   outlet(0, ["bytes"].concat(encode()));
+  knobs();
 }
 function bang() { out(); }
 function onresize() { mgraphics.redraw(); }
@@ -426,6 +497,6 @@ function anything() {
 }
 
 paint = sidguard("table", paint); note = sidguard("table", note); rate = sidguard("table", rate); anything = sidguard("table", anything); tick = sidguard("table", tick); onclick = sidguard("table", onclick); ondrag = sidguard("table", ondrag); bytes = sidguard("table", bytes);
-onidle = sidguard("table", onidle); ondblclick = sidguard("table", ondblclick); setvalueof = sidguard("table", setvalueof);
+onidle = sidguard("table", onidle); ondblclick = sidguard("table", ondblclick); setvalueof = sidguard("table", setvalueof); push = sidguard("table", push);
 reset();                                                                 // silent: a reload (autowatch) must not send an empty table to the synth
 sidlog("table", "loaded");

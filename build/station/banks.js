@@ -7,6 +7,10 @@ const osc = (n) => {
     ["Osc" + n, [o("Wave"), o("PWM Start"), o("PWM Add"), o("PWM LFO Depth"), o("Transpose"), o("Detune"), o("Sync"), o("Ring")]],
     ["Osc" + n + " Env", [o("Attack"), o("Decay"), o("Sustain"), o("Release"), o("Delay"), o("Gate"), o("Active"), o("Porta Speed")]],
     ["Osc" + n + " Mod", [o("Vib Depth"), o("Vib LFO"), o("PWM LFO"), o("PWM Sync"), o("Arp Speed"), o("PB Range"), o("Table Speed"), o("Track Mode")]],
+    // the waveform table step by step (build/station/voice.js PUSH_TABLE): visible on Push only, not automated, not stored;
+    // slot 4 is Note or Offset, swapped at runtime by live.banks after the step's pitch mode; slot 7 is Speed, or Loop To while the
+    // table loops. (Bank buttons, live.banks @buttons, go nowhere on Push 2, and a "buttons" list in the saved bank crashed Live 12.4.7.)
+    ["Osc" + n + " Table", [o("Table Step"), o("Table Wave"), o("Table Mod"), o("Table Pitch"), o("Table Note"), o("Table Length"), o("Table Loop"), o("Table Speed")]],
   ];
 };
 const lfo = (n) => {
@@ -26,7 +30,8 @@ const BANKS = [
   ...lfo(1), ...lfo(2), ...lfo(3), ...lfo(4),
 ];
 
-// patcher.parameters as Max saves it: every parameter by box id, and the banks as lists of long names ("-" = empty slot).
+// patcher.parameters as Max saves it: every parameter by box id, and the banks as lists of long names ("-" = empty slot), with the
+// bank's buttons (live.banks @buttons) as a second list where a bank has them.
 function parameters(boxes) {
   const ids = new Map(), out = {};
   for (const { box: b } of boxes) {
@@ -34,13 +39,14 @@ function parameters(boxes) {
     if (v && v.parameter_longname) { ids.set(v.parameter_longname, b.id); out[b.id] = [v.parameter_longname, v.parameter_shortname, 0]; }
   }
   const banks = {};
-  BANKS.forEach(([name, params], i) => {
+  BANKS.forEach(([name, params, buttons], i) => {
     if (params.length !== 8) throw new Error("bank " + name + ": " + params.length + " parameters, not 8");
-    banks[i] = { index: i, name, parameters: params.map((p) => {
+    const check = (p) => {
       if (p === null) return "-";
       if (!ids.has(p)) throw new Error("bank " + name + ": no parameter " + p);
       return p;
-    }) };
+    };
+    banks[i] = { index: i, name, parameters: params.map(check), ...(buttons ? { buttons: buttons.map(check) } : {}) };
   });
   out.parameterbanks = banks;
   out.inherited_shortname = 1;
