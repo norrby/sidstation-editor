@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const { midiParser } = require("../lib/midi");
 const fs = require("fs");
 const path = require("path");
-const { sidlog, sidguard } = require("../lib/maxlog");
+const { sidlog, sidguard, sidUserPaths } = require("../lib/maxlog");
 const S = require("../lib/sysex");
 const SidParams = require("../lib/params");
 
@@ -115,7 +115,7 @@ test("settings: 06 passes the gateway; a stray reply without a store does nothin
 
 test("the capture passes 46/47 on as settings/stored and does not save them; sid.load sends the rate to the playheads and the LFO views", () => {
   const sent = [], logs = [];
-  const g = { midiParser, sidlog: (...a) => logs.push(a.join(" ")), sidguard, ...S, inlets: 0, outlets: 0, post() {}, arrayfromargs: (a) => Array.from(a),
+  const g = { midiParser, sidlog: (...a) => logs.push(a.join(" ")), sidguard, sidUserPaths, ...S, inlets: 0, outlets: 0, post() {}, arrayfromargs: (a) => Array.from(a),
     outlet: (o, ...a) => sent.push([o].concat(a)), File: class { constructor() { throw new Error("must not save a reply"); } } };
   const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.capture.js"), "utf8").replace(/^inlets = 1;\noutlets = 2;\n/m, "");
   const cap = new Function(...Object.keys(g), src + "\nreturn { msg_int };")(...Object.values(g));
@@ -136,7 +136,7 @@ test("the capture passes 46/47 on as settings/stored and does not save them; sid
 
 test("capture (built into SidStation, hears all SysEx): a foreign or short frame is logged and ignored – no crash, no file, no output", () => {
   const sent = [], logs = [];
-  const g = { midiParser, sidlog: (...a) => logs.push(a.join(" ")), sidguard, ...S, inlets: 0, outlets: 0, post() {}, arrayfromargs: (a) => Array.from(a),
+  const g = { midiParser, sidlog: (...a) => logs.push(a.join(" ")), sidguard, sidUserPaths, ...S, inlets: 0, outlets: 0, post() {}, arrayfromargs: (a) => Array.from(a),
     outlet: (o, ...a) => sent.push([o].concat(a)), File: class { constructor() { throw new Error("must not save a foreign frame"); } } };
   const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.capture.js"), "utf8").replace(/^inlets = 1;\noutlets = 2;\n/m, "");
   const cap = new Function(...Object.keys(g), src + "\nreturn { msg_int };")(...Object.values(g));

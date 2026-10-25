@@ -13,7 +13,9 @@ inlets = 1;
 outlets = 2;
 
 // Dumps are kept only when this folder exists (Max cannot create folders); otherwise they are just loaded into the editor.
-let dumpDir = "~/Documents/SidStation/dumps";
+// Documents/SidStation/dumps in the home folder; the places to try come from sidUserPaths (lib/maxlog.js), the first
+// that works is kept. "dir <path>" sets one folder instead.
+let dumpDirs = sidUserPaths("Documents/SidStation/dumps");
 let last = null;
 let seq = 0;
 
@@ -28,7 +30,7 @@ function msg_int(b) { midiIn(b); }                                   // a declar
 
 
 function list() { for (const a of arrayfromargs(arguments)) msg_int(a); }
-function dir(p) { dumpDir = p; post("sid.capture: dir = " + dumpDir + "\n"); }
+function dir(p) { dumpDirs = [String(p)]; post("sid.capture: dir = " + p + "\n"); }
 function clear() { seq = 0; post("sid.capture: cleared\n"); }
 function dump() { if (last) finish(last); else post("sid.capture: no frame yet\n"); }
 
@@ -53,12 +55,14 @@ function finish(frame) {
   const stamp = d.getFullYear() + "-" + two(d.getMonth() + 1) + "-" + two(d.getDate()) + "-" + two(d.getHours()) + "-" + two(d.getMinutes());
   const tag = info.name ? info.name.trim().replace(/[^A-Za-z0-9_-]/g, "_") : ("id" + hex(frame[6]));
   seq++;
-  const path = dumpDir + "/" + stamp + "_" + String(seq).padStart(3, "0") + "_" + tag + ".syx";
-  if (save(path, frame)) {
-    sidlog("capture", "saved " + frame.length + " bytes to " + path);
-    outlet(1, "saved", path);
+  const name = "/" + stamp + "_" + String(seq).padStart(3, "0") + "_" + tag + ".syx";
+  const dir = dumpDirs.find((p) => save(p + name, frame));
+  if (dir) {
+    dumpDirs = [dir];
+    sidlog("capture", "saved " + frame.length + " bytes to " + dir + name);
+    outlet(1, "saved", dir + name);
   } else {
-    sidlog("capture", "not saved: " + dumpDir + " does not exist (create it to keep dumps) – hex follows in the console");
+    sidlog("capture", "not saved: " + dumpDirs.join(" or ") + " does not exist (create it to keep dumps) – hex follows in the console");
     post(frame.map(hex).join(" ") + "\n");
   }
   report(frame, info);
