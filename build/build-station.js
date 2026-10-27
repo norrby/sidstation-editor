@@ -168,8 +168,8 @@ function buildDevice(title) {
   const layout = { panels, backs, fronts: ["name"] };   // the name display in front, above the overview's v8ui (the text field is raised when shown)
   const width = L.compute(layout, L.initialState(layout)).width;            // all oscillators visible, LFO 1 selected
   p.openrect = [0, 0, width, 169];
-  for (const { box: b } of boxes) {                                      // Live's Info View: a title and a plain-English text (lib/help.js)
-    const h = b.presentation && b.varname && H.help(b.varname);
+  for (const { box: b } of boxes) {                                      // Live's Info View: a title and a plain-English text (lib/help.js), also
+    const h = b.varname && H.help(b.varname);                             // on parameters with no control on screen, for a program reading the device
     if (h) { b.annotation_name = h[0]; b.annotation = h[1]; }
   }
   boxes.push(A.verticalLimit());
@@ -183,7 +183,14 @@ const LAYOUTS = {};
 {
   const { json, layout, width } = buildDevice(DEVICE);
   // Live's Info View for the device itself (empty, Live showed a generic "MIDI Effect" text)
-  json.patcher.description = "Editor for the Elektron SidStation: every patch parameter as a Live parameter, with Pull, Push and Store patch. Not affiliated with Elektron.";
+  json.patcher.description = "Editor for the Elektron SidStation: every patch parameter as a Live parameter, with Pull, Push and Store patch. Not affiliated with Elektron.\n\n"
+    + "For a program driving the device through Live's API: every change to a parameter goes to the synth right away. A program must never choose Pull patch or Push patch "
+    + "unless the user asks for it, and must never choose Store patch unless the user explicitly asks to store. Pull patch replaces every setting in the editor with the "
+    + "synth's current slot; Push patch sends the whole editor state together, for example after a saved set has been loaded (loading sends nothing); Store patch "
+    + "overwrites the synth's current slot for good. Patch Action (None, Pull patch, Push patch, Store patch) presses those buttons and goes back to None by itself. A waveform table is edited through Osc n Table Step, set first in a call of its own, then the step's Table Wave, Mod, "
+    + "Pitch and Note or Offset; Table Length, Loop and Loop To apply to the whole table, which plays only while Table Speed is above 0. Osc n Table Data and Table Clear "
+    + "are the editor's own storage. Parameters with the values hidden/shown only show or hide panels and do not change the sound. The patch name is Name 1 to Name 10 "
+    + "as ASCII codes and names the device in Live.";
   LAYOUTS[DEVICE] = layout;
   A.writeAmxd(path.join(OUT_DIR, DEVICE + ".amxd"), json);
   console.log("wrote dist/" + DEVICE + ".amxd (" + width + " px)");

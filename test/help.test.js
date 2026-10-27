@@ -16,6 +16,19 @@ test("SidStation: every presented control has annotation_name and annotation", (
   assert.deepEqual(missing, []);
 });
 
+test("SidStation: every parameter has a help text, on screen or not (read by programs driving the device through Live's API)", () => {
+  const p = readAmxd(path.join(__dirname, "..", "dist", NAME + ".amxd")).json.patcher;
+  const missing = p.boxes.map((x) => x.box)
+    .filter((b) => b.saved_attribute_attributes && b.saved_attribute_attributes.valueof && b.saved_attribute_attributes.valueof.parameter_longname)
+    .filter((b) => !b.annotation || !b.annotation_name).map((b) => b.varname);
+  assert.deepEqual(missing, []);
+  const byVar = (v) => p.boxes.find((b) => b.box.varname === v).box;
+  assert.match(byVar("o2_pushstep").annotation, /oscillator 2's waveform table .* before them/);
+  assert.match(byVar("o1_show").annotation, /Does not change the sound/);
+  assert.match(byVar("c_action").annotation, /Store patch overwrites.*\[ask first\]$/);
+  assert.match(p.description, /Live's API/);
+});
+
 test("help: sync and ring name the previous oscillator", () => {
   assert.match(help("o1_sync")[1], /oscillator 3/);
   assert.match(help("o2_ring")[1], /oscillator 1/);
