@@ -1,6 +1,6 @@
 {
   "name": "sidstation-editor",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "productName": "SidStation Editor",
   "private": true,
   "description": "Max for Live editor for the Elektron SidStation synthesizer",
