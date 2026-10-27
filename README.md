@@ -37,6 +37,9 @@ Not affiliated with or endorsed by Elektron. Use at your own risk.
   and Store patch: setting it from automation, a MIDI mapping or Live's API does that action and
   returns it to None. Map a button to it, not a knob: a knob sweeping through the choices does all
   three.
+- Every parameter has a help text in Live's Info View, also those with no control on screen, and
+  the device description tells a program driving the editor through Live's API how to behave:
+  edits reach the synth at once, and Pull, Push and Store patch are never chosen unless asked.
 - **Push 2:** every parameter in banks, and the waveform tables edited step by step (see Push below).
 - **"(using waveform table)"** after an oscillator's title shows that the table, not the Wave switch, sets
   its waveform. The Info View explains, and holding the mouse over the note points out the table.
