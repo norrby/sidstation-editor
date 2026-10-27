@@ -200,6 +200,27 @@ test("SidStation: every live.text shows its parameter's values in Live and on Pu
   }
 });
 
+test("SidStation: Patch Action is an automated parameter off screen and off Push that fires the buttons' messages and resets to None", () => {
+  const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", NAME + ".amxd")).json.patcher;
+  const text = (id) => (p.boxes.find((b) => b.box.id === id) || { box: {} }).box.text;
+  const from = (id, outlet) => p.lines.filter((l) => l.patchline.source[0] === id && l.patchline.source[1] === outlet).map((l) => l.patchline.destination[0]);
+  const menu = p.boxes.find((b) => b.box.varname === "c_action"), vo = menu.box.saved_attribute_attributes.valueof;
+  assert.equal(menu.box.maxclass, "live.menu");
+  assert.equal(vo.parameter_longname, "Patch Action");
+  assert.deepEqual(vo.parameter_enum, ["None", "Pull patch", "Push patch", "Store patch"]);
+  assert.equal(vo.parameter_invisible, 0, "in Live's parameter list");
+  assert.deepEqual([vo.parameter_initial_enable, vo.parameter_initial], [1, [0]], "a new device starts at None");
+  assert.ok(!menu.box.presentation, "not on screen");
+  for (const b of Object.values(p.parameters.parameterbanks)) assert.ok(!b.parameters.includes("Patch Action"), b.name + ": not on Push");
+  const [sel0] = from(menu.box.id, 0); assert.equal(text(sel0), "sel 0");
+  assert.deepEqual(from(sel0, 0), [], "None does nothing");
+  const [t] = from(sel0, 1); assert.equal(text(t), "t b i");
+  const [delay] = from(t, 0); assert.equal(text(delay), "delay 50", "the reset in its own event, or Live ignores it");
+  const [zero] = from(delay, 0); assert.equal(text(zero), "0"); assert.deepEqual(from(zero, 0), [menu.box.id], "back to None as a value");
+  const [sel] = from(t, 1); assert.equal(text(sel), "sel 1 2 3");
+  assert.deepEqual([0, 1, 2].map((o) => text(from(sel, o)[0])), ["fetch", "sendall", "store"], "the buttons' own messages");
+});
+
 test("SidStation: the Push table knobs are visible on Push only (not automated, no initial output, no presentation) and wired to the table", () => {
   const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", NAME + ".amxd")).json.patcher;
   const { PUSH_VISIBLE } = require("../build/station/common");

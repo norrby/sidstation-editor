@@ -33,6 +33,7 @@ const STORE_RECT = [PAD, 150, PCOL_BTN, 15];                   // Store below Pu
 const SENDALL_TEXT = "Push patch";
 const STORE_TEXT = "Store patch";
 const FETCH_TEXT = "Pull patch";
+const ACTION_LONG = "Patch Action";                           // the parameter that triggers Pull/Push/Store from Live (API, mapping, automation)
 // Produces the overview panel's items for the column (x relative to the overview box's left edge).
 function patchColumn(x0, ctx) {
   const { id, boxes, lines, vFilter } = ctx;
@@ -81,6 +82,22 @@ function patchColumn(x0, ctx) {
   lines.push(A.line(vStore, 0, vStoreSel, 0), A.line(vStoreSel, 0, vStoreMsg, 0), A.line(vStoreSel, 1, vStoreSel1, 0), A.line(vStoreSel1, 0, vStoreMsg, 0),
     A.line(vStoreMsg, 0, vFilter, 0));
   items.push({ name: "c_store", rect: STORE_RECT });
+  // Patch Action: the same three actions as a Live parameter, for automation, MIDI mapping and Live's API (the buttons themselves
+  // are hidden from Live, see actionButton). A quantized parameter None | Pull patch | Push patch | Store patch, off screen and off
+  // Push (in no bank): a value 1-3 -> [sel 0] (None passes nothing) -> [t b i]: the action first (right outlet -> [sel 1 2 3] ->
+  // the buttons' messages), then [delay 50] -> [0( back into the menu as a value (not "set": Live follows only a value), so Live
+  // shows None again and a saved set holds None: loading sends nothing. The delay: a value sent back in the same event as Live's
+  // own update never reached Live's parameter (tried 2026-10-26 via the Extensions API: it stayed at Pull patch). parameter_initial
+  // None for a new device; no undo steps.
+  const vAct = id(), vActSel0 = id(), vActT = id(), vActSel = id(), vActZero = id(), vActDelay = id();
+  boxes.push(live(vAct, "live.menu", [3500, 2500, 100, 15], null, { parameter_longname: ACTION_LONG, parameter_shortname: "Action",
+      parameter_type: 2, parameter_enum: ["None", FETCH_TEXT, SENDALL_TEXT, STORE_TEXT], parameter_mmax: 3, parameter_invisible: 0,
+      parameter_modmode: 0, parameter_initial_enable: 1, parameter_initial: [0], parameter_visible_undoable: 0 }, {}, "c_action"),
+    A.obj(vActSel0, "sel 0", [3500, 2520, 40, 20], 2, ["bang", ""]), A.obj(vActT, "t b i", [3500, 2545, 40, 20], 2, ["bang", "int"]),
+    A.obj(vActSel, "sel 1 2 3", [3560, 2570, 70, 20], 4, ["bang", "bang", "bang", ""]), A.obj(vActDelay, "delay 50", [3500, 2570, 50, 20], 1, ["bang"]),
+    A.msg(vActZero, "0", [3500, 2595, 30, 20]));
+  lines.push(A.line(vAct, 0, vActSel0, 0), A.line(vActSel0, 1, vActT, 0), A.line(vActT, 1, vActSel, 0), A.line(vActT, 0, vActDelay, 0),
+    A.line(vActDelay, 0, vActZero, 0), A.line(vActZero, 0, vAct, 0), A.line(vActSel, 0, vFetchMsg, 0), A.line(vActSel, 1, vMsg, 0), A.line(vActSel, 2, vStoreMsg, 0));
   return items;
 }
 
