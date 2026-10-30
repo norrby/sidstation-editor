@@ -14,7 +14,7 @@ function loadFilter() {
   const g = { UI, sidlog, sidguard, SidParams, encodeDP, inlets: 0, outlets: 0, post() {}, outlet: (o, msg, ...a) => { if (msg === "frame") out.push(a); }, arrayfromargs: (a) => Array.from(a), messagename: "x",
     Task: class { constructor(fn) { this.fn = fn; } schedule() {} cancel() {} } };
   const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.filter.js"), "utf8").replace(/^inlets = 1;\noutlets = 2;\n/m, "");
-  const f = new Function(...Object.keys(g), src + "\nreturn { route, arm, sendall, quiet, msg: (n, v) => { messagename = n; anything(v); } };")(...Object.values(g));
+  const f = new Function(...Object.keys(g), src + "\nreturn { route, arm, sendall, quiet, slot, msg: (n, v) => { messagename = n; anything(v); } };")(...Object.values(g));
   for (const d of SidParams.FILTER.concat(SidParams.COMMON)) f.msg(d.key, d.init);   // Live's restore on load: the starting point
   for (let n = 1; n <= 3; n++) f.route(n, 1);
   out.length = 0;
@@ -198,6 +198,20 @@ test("SidStation: every live.text shows its parameter's values in Live and on Pu
     const e = b.saved_attribute_attributes.valueof.parameter_enum;
     assert.deepEqual([b.automation, b.automationon], e, b.varname);
   }
+});
+
+test("filter router: Patch Number sends a program change, except the first value (Live's restore), while quiet, or with Push patch", () => {
+  const { f, out } = loadFilter();
+  f.slot(42); f.arm(); assert.deepEqual(out.splice(0), [], "the first value is Live's restore");
+  f.slot(43); assert.deepEqual(out.splice(0), [[0xc0, 43]]);
+  f.slot(250); assert.deepEqual(out.splice(0), [[0xc0, 99]], "never above 99");
+  f.quiet(); f.slot(7); assert.deepEqual(out.splice(0), [], "a dump on its way in: not sent");
+  f.quiet(-1); f.sendall(); assert.ok(!out.some((m) => (m[0] & 0xf0) === 0xc0), "Push patch sends no program change");
+  const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", NAME + ".amxd")).json.patcher;
+  const slot = p.boxes.find((b) => b.box.varname === "c_slot").box, vo = slot.saved_attribute_attributes.valueof;
+  assert.ok(!slot.presentation, "not on screen"); assert.deepEqual([vo.parameter_enum.length, vo.parameter_enum[0], vo.parameter_enum[99], vo.parameter_mmax, vo.parameter_invisible || 0], [100, "P00", "P99", 99, 0]);
+  assert.match(slot.annotation, /\[ask first\]$/);
+  assert.equal(Object.values(p.parameters.parameterbanks).find((b) => b.name === "Patch").parameters[0], "Patch Number");
 });
 
 test("overview: a disabled ring arrow's tip goes to the tooltip layer, which lies in front of the name display and lets the mouse through", () => {

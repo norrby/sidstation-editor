@@ -6,6 +6,8 @@
 // In:  <param> <v>      cutoff res envdepth lfodepth fattack fdecay fsustain frelease wheel flfo ftype wrap invert poly legato hcut
 //      route <n> <0|1>  osc n through the filter (1) or straight to the output (0)
 //      namechar <i> <code>  the patch name's character i (1..10), ASCII -> DP 00 0(i-1) 7f 00 (from sid.name.js via the Name parameters)
+//      slot <n>         the Patch Slot knob (Push): program change n (0..99) selects that patch on the synth; the first value is
+//                       Live's restore and is not sent, and Push patch leaves the slot alone
 //      arm              start sending (on load the values from live.* come first)
 //      sendall          send everything now
 //      quiet [ms]       patch dump on its way in (sid.load.js): send nothing for 1.5 s
@@ -111,10 +113,21 @@ function store() {
   catch (e) { sidlog("filter", "store error:", e.message); }
 }
 function channel(n) { chan = Math.max(1, Math.min(16, n | 0)); }
+// Patch Slot: a program change, not a patch parameter: not in val, so Push patch never sends it, and a dump never sets it.
+let slotSeen = false;
+function slot(v) {
+  v = Math.round(Number(v));
+  if (!Number.isFinite(v)) { sidlog("filter", "invalid slot", v); return; }
+  v = Math.max(0, Math.min(99, v));                                      // the synth does not range-check 100..127
+  if (!slotSeen) { slotSeen = true; if (armed) sidlog("filter", "first slot kept, not sent:", v); return; }   // Live's restore on load
+  if (muted()) return;
+  tx([0xc0 | (chan - 1), v]);
+  outlet(0, "status", "filter: program change " + v);
+}
 function anything() {
   const a = arrayfromargs(arguments);
   param(String(messagename), a[0]);
 }
 
-anything = sidguard("filter", anything); route = sidguard("filter", route); namechar = sidguard("filter", namechar); sendall = sidguard("filter", sendall); fetch = sidguard("filter", fetch); store = sidguard("filter", store); quiet = sidguard("filter", quiet);
+anything = sidguard("filter", anything); route = sidguard("filter", route); namechar = sidguard("filter", namechar); sendall = sidguard("filter", sendall); fetch = sidguard("filter", fetch); store = sidguard("filter", store); quiet = sidguard("filter", quiet); slot = sidguard("filter", slot);
 sidlog("filter", "loaded");

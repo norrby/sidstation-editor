@@ -97,7 +97,8 @@ input port: restart Live.
 ## Push
 
 With a Push 2 (or 3) the device shows its parameters in banks: **Main** (filter and the three
-oscillators' waveforms), **Patch**, **Filter**, **Filter Env**, four per oscillator (**Osc1**, **Osc1 Env**,
+oscillators' waveforms), **Patch** (starting with **Patch No**, a knob only on Push: a program change that
+selects which of the synth's patches, P00 to P99, it plays, so you can try sounds while playing), **Filter**, **Filter Env**, four per oscillator (**Osc1**, **Osc1 Env**,
 **Osc1 Mod**, **Osc1 Table**) and two per LFO. The one-shot buttons (Push, Pull and Store patch) are kept
 off Push, so a stray touch never sends or stores a patch. The patch name is the device name in Push's
 header.

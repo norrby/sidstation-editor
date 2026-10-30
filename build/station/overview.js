@@ -60,6 +60,15 @@ function patchColumn(x0, ctx) {
     }
     items.push({ name: "c_" + d.key, rect });
   }
+  // Patch Number: a knob on Push only (no control on screen), first in the Patch bank: a program change selects that patch on the
+  // synth, shown as the synth shows it (P00..P99). Through the filter router like Poly/Legato/HCut ("slot <n>", the code's word for
+  // a patch position), which keeps the first value (Live's restore) to itself.
+  const vSlot = id(), vSlotPre = id();
+  boxes.push(live(vSlot, "live.menu", [3200, 2400 + row * 30, 60, 18], null, { parameter_longname: "Patch Number", parameter_shortname: "Patch No",
+      parameter_type: 2, parameter_enum: Array.from({ length: 100 }, (_, i) => "P" + String(i).padStart(2, "0")), parameter_mmax: 99,
+      parameter_modmode: 0, parameter_initial_enable: 1, parameter_initial: [0] },
+    {}, "c_slot"), A.obj(vSlotPre, "prepend slot", [3300, 2400 + row * 30, 70, 20]));
+  lines.push(A.line(vSlot, 0, vSlotPre, 0), A.line(vSlotPre, 0, vFilter, 0));
   // Push: sendall to osc 1–3, the filter/common (including the name) and LFO 1–4 (one button for the whole patch)
   const vBtn = id(), vSel = id(), vSel1 = id(), vMsg = id();
   boxes.push(actionButton(vBtn, [3200, 2500, 60, 15], px(SENDALL_RECT), "Push Patch", SENDALL_TEXT, "c_sendall"),
