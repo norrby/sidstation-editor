@@ -200,6 +200,35 @@ test("SidStation: every live.text shows its parameter's values in Live and on Pu
   }
 });
 
+test("overview: a disabled ring arrow's tip goes to the tooltip layer, which lies in front of the name display and lets the mouse through", () => {
+  const { w, out } = loadUi("sid.map.js", [230, 163], "paint, onidle, onidleout, idle, idleout, set, G");
+  const G = w.G;
+  w.set("ringok", 2, 0); out.length = 0;                                                      // ring 1 -> 2 cannot work (osc 2 is not Tri/Mixed)
+  w.onidle(G.laneRing, (G.rows[0] + G.rows[1]) / 2);
+  assert.deepEqual(out.splice(0), ["tip " + G.laneRing + " " + (G.rows[0] + G.rows[1]) / 2 + " Ring 1 -> 2 has no effect: ring modulation only affects the triangle wave. Set osc 2 to Tri or Mixed."]);
+  w.onidle(G.laneRing, (G.rows[0] + G.rows[1]) / 2); assert.deepEqual(out.splice(0), [], "same spot: nothing new");
+  w.onidleout(); assert.deepEqual(out.splice(0), ["tip"]);
+  w.paint(); assert.deepEqual(out.splice(0), []);
+  // The layer draws the tip above the pointer and never outside its box
+  const t = loadUi("sid.tip.js", [230, 163], "paint, tip, onidle, onidleout");
+  t.w.tip(10, 20, "one line", "two"); t.w.paint();
+  assert.equal(t.rects.length, 1); assert.ok(t.rects[0].y >= 2, "kept inside at the top");
+  t.w.tip(); t.rects.length = 0; t.w.paint(); assert.equal(t.rects.length, 0, "hidden draws nothing");
+  // Built: the map's outlet 1 -> the layer, which ignores clicks, has the map's rect and is raised last
+  const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", NAME + ".amxd")).json.patcher;
+  const byVar = (v) => p.boxes.find((b) => b.box.varname === v).box;
+  const map = byVar("map"), tip = byVar("tip");
+  assert.equal(tip.ignoreclick, 1); assert.deepEqual(tip.presentation_rect, map.presentation_rect);
+  assert.ok(p.lines.some((l) => l.patchline.source[0] === map.id && l.patchline.source[1] === 1 && l.patchline.destination[0] === tip.id));
+  assert.ok(p.lines.some((l) => l.patchline.source[0] === tip.id && l.patchline.destination[0] === map.id), "the hovering back to the map");
+  t.out.length = 0; t.w.onidle(5, 6); t.w.onidleout(); assert.deepEqual(t.out, ["idle 5 6", "idleout"]);
+  w.set("ringok", 2, 0); out.length = 0; w.idle(G.laneRing, (G.rows[0] + G.rows[1]) / 2); assert.equal(out.length, 1); w.idleout(); assert.deepEqual(out.splice(1), ["tip"]);
+  const L = require("../lib/layout");
+  const layout = JSON.parse(/const LAYOUTS = (.*);\n/.exec(fs.readFileSync(path.join(__dirname, "..", "dist", "sid.layout.js"), "utf8"))[1])[NAME];
+  assert.deepEqual(layout.fronts, ["name", "tip"]);
+  assert.ok(L.messages(L.compute(layout, L.initialState(layout)).ops, null, layout.backs, layout.fronts).slice(-1)[0], "script bringtofront tip");
+});
+
 test("SidStation: Patch Action is an automated parameter off screen and off Push that fires the buttons' messages and resets to None", () => {
   const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", NAME + ".amxd")).json.patcher;
   const text = (id) => (p.boxes.find((b) => b.box.id === id) || { box: {} }).box.text;

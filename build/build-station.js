@@ -165,7 +165,7 @@ function buildDevice(title) {
   const inner = (v) => /oscframe|envframe|^f_frame$|^l\d_frame$|^mapinnerframe$/.test(v);    // sub-panels (also the filter's f_frame and the LFOs' l<n>_frame)
   const bgsVn = boxes.filter((b) => b.box.filename === "sid.voicebg.js").map((b) => b.box.varname);   // the voice backgrounds furthest back
   const backs = panelsVn.filter(inner).concat(panelsVn.filter((v) => !inner(v)), bgsVn);
-  const layout = { panels, backs, fronts: ["name"] };   // the name display in front, above the overview's v8ui (the text field is raised when shown)
+  const layout = { panels, backs, fronts: ["name", "tip"] };   // the name display in front of the overview's v8ui (the text field is raised when shown), the tooltip layer in front of that
   const width = L.compute(layout, L.initialState(layout)).width;            // all oscillators visible, LFO 1 selected
   p.openrect = [0, 0, width, 169];
   for (const { box: b } of boxes) {                                      // Live's Info View: a title and a plain-English text (lib/help.js), also
@@ -203,6 +203,6 @@ writeIfChanged(path.join(OUT_DIR, "sid.send.js"), ["lib/maxlog.js", "lib/sysex.j
 writeIfChanged(path.join(OUT_DIR, "sid.capture.js"), ["lib/maxlog.js", "lib/sysex.js", "lib/midi.js", "max/sid.capture.js"].map(read).join("\n\n"));               // the capture
 writeIfChanged(path.join(OUT_DIR, "sid.load.js"), ["lib/maxlog.js", "lib/params.js", "max/sid.load.js"].map(read).join("\n\n"));
 writeIfChanged(path.join(OUT_DIR, "sid.layout.js"), [read("lib/maxlog.js"), read("lib/layout.js"), "const LAYOUTS = " + JSON.stringify(LAYOUTS) + ";\n", read("max/sid.layout.js")].join("\n\n"));
-for (const f of ["sid.adsr.js", "sid.pulse.js", "sid.note.js", "sid.map.js", "sid.fold.js", "sid.section.js", "sid.filtcurve.js", "sid.legend.js", "sid.vslider.js", "sid.name.js", "sid.lfoview.js", "sid.table.js", "sid.voicebg.js", "sid.tablenote.js", "sid.lfotabs.js", "sid.loopbtn.js", "sid.litbtn.js", "sid.activebtn.js", "sid.dimbtn.js"]) writeIfChanged(path.join(OUT_DIR, f), ["lib/maxlog.js", "lib/ui.js", "max/" + f].map(read).join("\n\n").replace("\n\n// sid.name.js", "\n\nconst DEVICE_NAME = " + JSON.stringify(DEVICE) + ";\n\n// sid.name.js"));   // + the shared palette (and the device name for sid.name.js)
+for (const f of ["sid.adsr.js", "sid.pulse.js", "sid.note.js", "sid.map.js", "sid.fold.js", "sid.section.js", "sid.filtcurve.js", "sid.legend.js", "sid.vslider.js", "sid.name.js", "sid.lfoview.js", "sid.table.js", "sid.voicebg.js", "sid.tablenote.js", "sid.lfotabs.js", "sid.loopbtn.js", "sid.litbtn.js", "sid.activebtn.js", "sid.dimbtn.js", "sid.tip.js"]) writeIfChanged(path.join(OUT_DIR, f), ["lib/maxlog.js", "lib/ui.js", "max/" + f].map(read).join("\n\n").replace("\n\n// sid.name.js", "\n\nconst DEVICE_NAME = " + JSON.stringify(DEVICE) + ";\n\n// sid.name.js"));   // + the shared palette (and the device name for sid.name.js)
 for (const f of fs.readdirSync(path.join(__dirname, "..", "max", "icons"))) copyIfChanged(path.join(__dirname, "..", "max", "icons", f), path.join(OUT_DIR, f));
 console.log("wrote dist/sid.osc.js, sid.layout.js, widgets, icons");

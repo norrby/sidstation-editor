@@ -17,7 +17,7 @@ mgraphics.relative_coords = 0;
 mgraphics.autofill = 0;
 
 inlets = 1;
-outlets = 1;
+outlets = 2;   // 0: the switches, 1: "tip …" to the tooltip layer (sid.tip.js)
 
 // The filter box spans all three rows so that osc 3's switch also points into the filter and not at
 // the Env box below it (otherwise the switch at osc 3 pointed at env when thrown towards the filter).
@@ -143,19 +143,12 @@ function paint() {
   const yA = G.rows[2], yB = G.rows[0];
   lane(sync[0], C.sync); mgraphics.move_to(G.osc[0], yA - 3); mgraphics.line_to(G.wrapSync, yA - 3); mgraphics.line_to(G.wrapSync, yB - 3); mgraphics.line_to(G.osc[0], yB - 3); mgraphics.stroke(); head(G.osc[0], yB - 3, 1, 0);
   lane(ring[0], C.ring, ringok[0] === 1); mgraphics.move_to(G.osc[0], yA + 3); mgraphics.line_to(G.wrapRing, yA + 3); mgraphics.line_to(G.wrapRing, yB + 3); mgraphics.line_to(G.osc[0], yB + 3); mgraphics.stroke(); head(G.osc[0], yB + 3, 1, 0);
-  if (tip) drawTip();
 }
 
-// Own tooltip (v8ui has none): shown when the mouse rests over a disabled ring arrow.
+// Own tooltip (v8ui has none): shown when the mouse rests over a disabled ring arrow. Drawn by the tooltip layer in front of
+// the overview (sid.tip.js, outlet 1), so the patch name display, which lies in front of this box, never hides it.
 let tip = null;   // { x, y, lines: [...] }
-function drawTip() {
-  mgraphics.set_font_size(9);
-  const w = Math.max.apply(null, tip.lines.map((t) => measure(t))) + 10, h = tip.lines.length * 12 + 6;
-  const W = mgraphics.size[0], x = Math.max(2, Math.min(W - w - 2, tip.x + 8)), y = Math.max(2, tip.y - h - 4);
-  mgraphics.set_source_rgba(0.1, 0.1, 0.1, 0.95); mgraphics.rectangle(x, y, w, h); mgraphics.fill();
-  mgraphics.set_source_rgba(1, 1, 1, 0.9);
-  tip.lines.forEach((t, i) => { mgraphics.move_to(x + 5, y + 13 + i * 12); mgraphics.show_text(t); });
-}
+function showTip() { if (tip) outlet(1, "tip", tip.x, tip.y, ...tip.lines); else outlet(1, "tip"); }
 // What is under the mouse, including things that cannot be clicked? -> text or null
 function hoverText(x, y) {
   for (let i = 0; i < 3; i++) {
@@ -169,10 +162,13 @@ function ringTip(target, source) { return ["Ring " + source + " -> " + target + 
 function onidle(x, y) {
   const lines = hoverText(x, y);
   const next = lines ? { x, y, lines } : null;
-  if (!!next !== !!tip) { tip = next; mgraphics.redraw(); }
-  else if (next && (next.x !== tip.x || next.y !== tip.y)) { tip = next; mgraphics.redraw(); }
+  if (!!next !== !!tip) { tip = next; showTip(); }
+  else if (next && (next.x !== tip.x || next.y !== tip.y)) { tip = next; showTip(); }
 }
-function onidleout() { if (tip) { tip = null; mgraphics.redraw(); } }
+function onidleout() { if (tip) { tip = null; showTip(); } }
+// The hovering as the tooltip layer in front passes it on
+function idle(x, y) { onidle(x, y); }
+function idleout() { onidleout(); }
 
 // What does the click hit?
 function hit(x, y) {

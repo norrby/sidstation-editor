@@ -12,7 +12,7 @@ const L = require("../lib/layout");
 const src = fs.readFileSync(path.join(__dirname, "..", "dist", "sid.layout.js"), "utf8");
 const LAYOUTS = JSON.parse(src.match(/const LAYOUTS = (.*);\n/)[1]);
 const TOL = 5, HEIGHT = 169;
-const ALLOWED = new Set(["map × name"]);
+const ALLOWED = new Set(["map × name", "map × tip", "name × tip"]);   // the name display and the tooltip layer lie on the overview on purpose
 
 function problems(layout, state) {
   const ops = L.compute(layout, state).ops.filter((o) => o.rect && !/frame/.test(o.name));

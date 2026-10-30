@@ -109,9 +109,13 @@ function mapPanel(x0, oscs, oscNos, filterShowId, filterEnvId, ctx) {
   const vW = id(), vRoute = id(), vV8 = vFilter;
   ctx.mapId = vW;
   boxes.unshift(frameBox(id(), "mapinnerframe", shifted(MAP_INNER, x0, 0), SHADE.inner), voiceFrame(id(), "mapframe", [x0, 0, MAP_TOTAL, DEVICE_H]));   // the frame + the patch tongue (sid.voicebg.js)
-  boxes.push(v8ui(vW, "sid.map.js", [1100, 100, 230, 163], [x0 + PCOL_W, FRAME_Y, MAP_W, FRAME_H], "map"),
-    A.obj(vRoute, "route show env sync ring route filter fenv off3", [1100, 280, 260, 20], 9, ["", "", "", "", "", "", "", "", ""]));
-  lines.push(A.line(vW, 0, vRoute, 0));
+  const vTip = id();
+  boxes.push({ box: { ...v8ui(vW, "sid.map.js", [1100, 100, 230, 163], [x0 + PCOL_W, FRAME_Y, MAP_W, FRAME_H], "map").box, numoutlets: 2, outlettype: ["", ""] } },
+    A.obj(vRoute, "route show env sync ring route filter fenv off3", [1100, 280, 260, 20], 9, ["", "", "", "", "", "", "", "", ""]),
+    // The tooltip layer: the overview's rect, in front of the name display (the layout's fronts); clicks go through it, the
+    // hovering it passes on to the overview ("idle x y" / "idleout")
+    { box: { ...v8ui(vTip, "sid.tip.js", [1400, 100, 230, 163], [x0 + PCOL_W, FRAME_Y, MAP_W, FRAME_H], "tip").box, ignoreclick: 1 } });
+  lines.push(A.line(vW, 0, vRoute, 0), A.line(vW, 1, vTip, 0), A.line(vTip, 0, vW, 0));
   // The patch name: ten characters in a 5×7 dot matrix (sid.name.js). Clicking the display opens a visible [textedit]
   // on top (script sendbox nameedit presentation 1 + bringtofront + select), you type with a cursor, Return
   // (keymode 1) outputs the text -> [route text] (textedit puts the selector "text" first) -> prepend typed -> the display,
@@ -197,7 +201,7 @@ function mapPanel(x0, oscs, oscNos, filterShowId, filterEnvId, ctx) {
   return { id: "map", kind: "fixed", width: MAP_TOTAL, items: [{ name: "mapinnerframe", rect: MAP_INNER },
     { name: "mapframe", rect: [0, 0, MAP_TOTAL, DEVICE_H], bg: { mode: 2, frame: [FRAME_Y, FRAME_Y + FRAME_H], inner: [INNER_Y, INNER_Y + INNER_H],
       rows: [{ ...PATCH_TONGUE, subs: [0], c: 4 }], subs: [[MAP_INNER[0], MAP_INNER[2]]] } }, { name: "map", rect: [PCOL_W, FRAME_Y, MAP_W, FRAME_H] },
-    { name: "name", rect: NAME_RECT }, { name: "nameedit", rect: null }].concat(patchItems) };
+    { name: "name", rect: NAME_RECT }, { name: "nameedit", rect: null }, { name: "tip", rect: [PCOL_W, FRAME_Y, MAP_W, FRAME_H] }].concat(patchItems) };
 }
 
 module.exports = { MAP_TOTAL, mapPanel };
