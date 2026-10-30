@@ -213,9 +213,23 @@ function store() { if (accept(encodeStore(), "store")) status("store queued (cur
 // The track's notes (built into SidStation): bytes from the osc 1 router, which already drops SysEx and passes whole channel
 // messages. Collected again here and checked like any channel message, then output at once (notes must not wait behind
 // DP traffic), except during a store (see play). SysEx bytes are never let through on this path.
+// What the track sends, counted per message type and logged once a second while anything passes: a flood (aftertouch from a
+// pad, a clock) can then be told from the notes.
+const TYPE = { 0x80: "note off", 0x90: "note on", 0xa0: "poly aftertouch", 0xb0: "CC", 0xc0: "program change", 0xd0: "channel pressure", 0xe0: "pitch bend",
+  0xf8: "clock", 0xfa: "start", 0xfb: "continue", 0xfc: "stop", 0xfe: "active sensing" };
+const seen = {}; let seenTask = null;
+function count(m) {
+  const t = TYPE[m[0]] || TYPE[m[0] & 0xf0] || ("status " + m[0].toString(16));
+  seen[t] = (seen[t] || 0) + 1;
+  if (!seenTask) {
+    seenTask = new Task(() => { seenTask = null; sidlog("send", "track input, last second: " + Object.keys(seen).map((k) => seen[k] + " " + k).join(", ")); for (const k of Object.keys(seen)) delete seen[k]; });
+    seenTask.schedule(1000);
+  }
+}
 const midiIn = midiParser({                                          // lib/midi.js
-  realtime: (b) => play([b]),
+  realtime: (b) => { count([b]); play([b]); },
   channel: (m) => {
+    count(m);
     // A program change from the track's input selects a slot on the synth (its name then blinks until ENTER): logged, so it can be told apart from the editor
     if ((m[0] & 0xf0) === 0xc0) sidlog("send", "track input: program change", m[1], "on channel", (m[0] & 0x0f) + 1);
     play(m);

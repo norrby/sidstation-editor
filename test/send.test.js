@@ -9,15 +9,25 @@ const S = require("../lib/sysex");
 const SidParams = require("../lib/params");
 
 function loadGateway() {
-  const out = [], status = [], sched = [];
+  const out = [], status = [], sched = [], logs = [];
   class Task { constructor(fn) { this.fn = fn; } schedule(ms) { sched.push([this, ms]); } cancel() { this.cancelled = true; } }
-  const g = { midiParser, sidlog, sidguard, ...S, SidParams, Task, File: class {}, inlets: 0, outlets: 0, post() {}, arrayfromargs: (a) => Array.from(a), messagename: "x",
+  const g = { midiParser, sidlog: (tag, ...a) => { logs.push(a.join(" ")); sidlog(tag, ...a); }, sidguard, ...S, SidParams, Task, File: class {}, inlets: 0, outlets: 0, post() {}, arrayfromargs: (a) => Array.from(a), messagename: "x",
     outlet: (o, ...a) => { if (o === 0) out.push(a[0]); else if (a[0] === "status") status.push(a[1]); } };
   const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.send.js"), "utf8").replace(/^inlets = 1;\noutlets = 2;\n/m, "");
   const fn = new Function(...Object.keys(g), src + "\nreturn { cc, note, pc, dp, frame, stop, send, msg_int, store, stored, get queue() { return queue; } };");
   const run = () => { while (sched.length) { const [t] = sched.shift(); if (!t.cancelled) t.fn(); } };   // drain all ticks
-  return { w: fn(...Object.values(g)), out, status, sched, run };
+  return { w: fn(...Object.values(g)), out, status, sched, run, logs };
 }
+
+test("gateway: what the track sends is counted per type and logged once a second", () => {
+  const { w, run, logs } = loadGateway();
+  for (const b of [0x90, 60, 100, 0xd0, 5, 0xd0, 6, 0xd0, 7, 0xf8, 0x80, 60, 0]) w.msg_int(b);
+  assert.deepEqual(logs.filter((l) => l.startsWith("track input")), [], "nothing until the second is up");
+  run();
+  assert.deepEqual(logs.filter((l) => l.startsWith("track input")), ["track input, last second: 1 note on, 3 channel pressure, 1 clock, 1 note off"]);
+  for (const b of [0x90, 62, 100]) w.msg_int(b); run();
+  assert.equal(logs.filter((l) => l.startsWith("track input")).pop(), "track input, last second: 1 note on", "counts start over");
+});
 const DP_TRI = [0xf0, 0x00, 0x20, 0x3c, 0x01, 0x00, 0x04, 0x00, 0x56, 0x0f, 0x04, 0x01, 0xf7];
 
 test("everything goes through one queue: one whole message per tick, in arrival order, with a pause", () => {
@@ -57,7 +67,7 @@ test("the note path (one track): channel messages go out at once, outside the qu
   const { w, out, sched } = loadGateway();
   for (const b of [0x90, 60, 100, 61, 90]) w.msg_int(b);                 // with running status
   assert.deepEqual(out.splice(0), [0x90, 60, 100, 0x90, 61, 90]);
-  assert.equal(sched.length, 0, "not queued");
+  assert.equal(w.queue.length, 0, "not queued");
   for (const b of [0xf0, 0x00, 0x20, 0x3c, 0x01, 0x00, 0x01, 0xf7]) w.msg_int(b);   // a "memory clear" frame
   assert.deepEqual(out, [], "SysEx on the note path is dropped");
   for (const b of [0xb0, 7]) w.msg_int(b);
