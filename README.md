@@ -112,9 +112,6 @@ One MIDI track does everything:
 - **Aftertouch** reaches the synth as channel pressure (an LFO's control source). On Push, choose
   *Mono* aftertouch in its setup: the polyphonic kind is not what the synth reads.
 
-If the synth's MIDI In light blinks but replies never reach the editor, Live may have lost the
-input port: restart Live.
-
 ## Push
 
 With a Push 2 (or 3) the device shows its parameters in banks: **Main** (filter and the three
