@@ -7,6 +7,8 @@ All notable changes to SidStation Editor are listed here, newest first. The form
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-10-31
+
 ### Added
 
 - The version is kept in the Live Set, as a hidden Version parameter, and written to the log when
@@ -67,7 +69,8 @@ First release.
 - Loading a Live Set sends nothing to the synth; every message to it is validated and goes through
   one gateway.
 
-[Unreleased]: https://github.com/norrby/sidstation-editor/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/norrby/sidstation-editor/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/norrby/sidstation-editor/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/norrby/sidstation-editor/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/norrby/sidstation-editor/compare/v0.1.0...v0.3.0
 [0.1.0]: https://github.com/norrby/sidstation-editor/releases/tag/v0.1.0
