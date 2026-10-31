@@ -97,7 +97,7 @@ function viaCC(d, v) {
   if (v < d.min || v > hi) return false;
   return SidParams.fromCC(SidParams.toCC(v, d.min, hi), d.min, hi) === v;
 }
-function param(key, v) {
+function param(key, v, keep) {
   const d = defs[key];
   if (!d) { sidlog("osc" + osc, "unknown parameter", key); return; }
   const raw = v;
@@ -106,7 +106,7 @@ function param(key, v) {
   v = Math.round(Number(v));
   if (!Number.isFinite(v)) { sidlog("osc" + osc, "invalid value", key, JSON.stringify(raw)); return; }
   v = Math.max(d.min, Math.min(d.max, v));
-  const first = !(key in val), prev = val[key];
+  const first = keep || !(key in val), prev = val[key];
   val[key] = v;
   // In the SID, ring modulation only acts on the triangle wave: Tri (0) and Mixed (3, Tri+Pulse). Outlet 1 ->
   // the Ring button (active 0/1) and the overview, regardless of arming.
@@ -124,10 +124,13 @@ function param(key, v) {
 }
 
 // Track in the panel: radio button "trackmode" (0 = Key follow, 1 = Note) + "tracknote 1..100"
-// -> one synth value (0 = Key, otherwise the note).
+// -> one synth value (0 = Key, otherwise the note). Two Live parameters, so each has its own first value (Live's restore):
+// with Note selected, Live restoring the mode and then the note would otherwise send the note on load.
 let trackMode = 0, trackNote = 60;
-function trackmode(v) { trackMode = v ? 1 : 0; param("track", trackMode ? trackNote : 0); }
-function tracknote(v) { trackNote = Math.max(1, Math.min(100, Math.round(Number(v)))); if (trackMode) param("track", trackNote); }
+const trackRestored = { mode: false, note: false };
+function restoring(control) { const first = !trackRestored[control]; trackRestored[control] = true; return first; }
+function trackmode(v) { const keep = restoring("mode"); trackMode = v ? 1 : 0; param("track", trackMode ? trackNote : 0, keep); }
+function tracknote(v) { const keep = restoring("note"); trackNote = Math.max(1, Math.min(100, Math.round(Number(v)))); if (trackMode) param("track", trackNote, keep); }
 
 function anything() {
   const a = arrayfromargs(arguments);

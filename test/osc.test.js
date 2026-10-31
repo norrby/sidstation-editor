@@ -9,7 +9,7 @@ const SidParams = require("../lib/params");
 const { encodeDP } = require("../lib/sysex");
 
 // frames ("frame <bytes>" on the gateway outlet) are recorded as ["gw", "frame", bytes…]
-function loadRouter(oscNo, armed = true) {
+function loadRouter(oscNo, armed = true, restoreTrack = true) {
   const out = [];
   const g = { midiParser, sidlog, sidguard, SidParams, encodeDP, inlets: 0, outlets: 0, jsarguments: ["sid.osc.js", oscNo], post() {},
     outlet: (o, ...a) => out.push(a[0] === "frame" ? ["gw", ...a] : [o, ...a]), arrayfromargs: (a) => Array.from(a), messagename: "x",
@@ -18,6 +18,7 @@ function loadRouter(oscNo, armed = true) {
   const fn = new Function(...Object.keys(g), src + "\nreturn { msg_int, param, sendall, arm, msg: (n, ...a) => { const fns = { trackmode, tracknote, sendall, arm, channel, quiet }; if (fns[n]) return fns[n](...a); messagename = n; anything(...a); } };");   // v8 calls named functions before anything
   const r = fn.call({}, ...Object.values(g));
   for (const d of SidParams.OSC) r.param(d.key, d.init);                   // Live restores every parameter on load: the starting point
+  if (restoreTrack) { r.msg("trackmode", 0); r.msg("tracknote", 60); }     // (Track is two Live parameters)
   out.length = 0;
   if (armed) r.arm();
   return { r, out };
@@ -101,6 +102,16 @@ test("Track in the panel: radio button Key follow | Note + note -> one synth val
   r.msg("tracknote", 99);  assert.deepEqual(bus(out.splice(0)), [0xb0, 35, 127]);
   r.msg("tracknote", 100); assert.deepEqual(bus(out.splice(0)).slice(7, 12), [0x00, 0x48, 0x7f, 0x00, 100]);
   r.msg("trackmode", 0);   assert.deepEqual(bus(out.splice(0)), [0xb0, 35, 0]);
+});
+
+test("Track: Live restoring Note and its note on load sends nothing, in either order; a later change is sent", () => {
+  for (const [a, b] of [[["trackmode", 1], ["tracknote", 72]], [["tracknote", 72], ["trackmode", 1]]]) {
+    const { r, out } = loadRouter(1, true, false);
+    r.msg(...a); r.msg(...b);
+    assert.deepEqual(bus(out), [], a[0] + " then " + b[0]);
+    r.msg("tracknote", 73);
+    assert.equal(bus(out.splice(0))[1], 35, "a change after the restore is sent");
+  }
 });
 
 test("the first value of a parameter (Live restoring it on load) is never sent, even after arm", () => {
