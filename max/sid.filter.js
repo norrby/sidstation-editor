@@ -82,11 +82,11 @@ function param(key, v) {
   // The first value of a parameter is what Live restores when the device loads: it is the starting point and never goes
   // to the synth, whenever it arrives (once it came after "armed" and 155 values overwrote the synth's edit buffer).
   if (first) {
-    if (d.field) fields[d.field] = d.values ? d.values[v] : v === 1 ? fields[d.field] | (1 << d.bit) : fields[d.field] & ~(1 << d.bit);
+    if (d.field) fields[d.field] = d.values[v];
     if (armed) sidlog("filter", "first value kept, not sent:", key, v);
     return;
   }
-  if (d.field) { if (d.values) setField(d.field, d.values[v]); else setBit(d.field, d.bit, v === 1); return; }
+  if (d.field) { setField(d.field, d.values[v]); return; }
   if (muted()) return;
   sendParam(d, v);
 }

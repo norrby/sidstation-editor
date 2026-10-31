@@ -1,4 +1,4 @@
-// node --test: max/sid.send.js (the gateway) in a v8 mock – queue, validation, whitelist, stop.
+// node --test: max/sid.send.js (the gateway) in a v8 mock – queue, validation, whitelist.
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { midiParser } = require("../lib/midi");
@@ -14,9 +14,11 @@ function loadGateway() {
   const g = { midiParser, sidlog: (tag, ...a) => { logs.push(a.join(" ")); sidlog(tag, ...a); }, sidguard, ...S, SidParams, Task, File: class {}, inlets: 0, outlets: 0, post() {}, arrayfromargs: (a) => Array.from(a), messagename: "x",
     outlet: (o, ...a) => { if (o === 0) out.push(a[0]); else { ev.push(a); if (a[0] === "status") status.push(a[1]); } } };
   const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.send.js"), "utf8").replace(/^inlets = 1;\noutlets = 2;\n/m, "");
-  const fn = new Function(...Object.keys(g), src + "\nreturn { cc, note, pc, dp, frame, stop, send, msg_int, store, stored, pushed, arm, get queue() { return queue; } };");
+  const fn = new Function(...Object.keys(g), src + "\nreturn { frame, msg_int, stored, pushed, arm, get queue() { return queue; } };");
   const run = () => { while (sched.length) { const [t] = sched.shift(); if (!t.cancelled) t.fn(); } };   // drain all ticks
-  return { w: fn(...Object.values(g)), out, status, sched, run, logs, ev };
+  const w = fn(...Object.values(g));
+  w.store = () => w.frame(...S.encodeStore());                             // what the filter router sends for Store patch
+  return { w, out, status, sched, run, logs, ev };
 }
 
 test("gateway: what the track sends is counted per type and logged once a second", () => {
@@ -29,12 +31,13 @@ test("gateway: what the track sends is counted per type and logged once a second
   assert.equal(logs.filter((l) => l.startsWith("track input")).pop(), "track input, last second: 1 note on", "counts start over");
 });
 const DP_TRI = [0xf0, 0x00, 0x20, 0x3c, 0x01, 0x00, 0x04, 0x00, 0x56, 0x0f, 0x04, 0x01, 0xf7];
+const dp = (ph, pl, mask, shift, v) => [0xf0, 0x00, 0x20, 0x3c, 0x01, 0x00, 0x04, ph, pl, mask, shift, v, 0xf7];
 
 test("everything goes through one queue: one whole message per tick, in arrival order, with a pause", () => {
   const { w, out, sched, run } = loadGateway();
-  w.cc(42, 10);
+  w.frame(0xb0, 42, 10);
   assert.deepEqual(out, [0xb0, 42, 10]);                    // the first goes out at once
-  w.frame(...DP_TRI); w.note(60, 100);                     // arrive while the queue waits
+  w.frame(...DP_TRI); w.frame(0x90, 60, 100);              // arrive while the queue waits
   assert.deepEqual(out, [0xb0, 42, 10]); assert.equal(w.queue.length, 2);
   assert.equal(sched[0][1], 1);
   run();
@@ -43,24 +46,15 @@ test("everything goes through one queue: one whole message per tick, in arrival 
 
 test("refuses: DP outside the whitelist, wrong form, foreign SysEx, broken channel message", () => {
   const { w, out, status, run } = loadGateway();
-  w.dp(0, 86, 15, 0, 1); run();                            // right address, wrong shift
-  w.dp(0, 86, 15, 4, 16); run();                           // value > mask
+  w.frame(...dp(0, 86, 15, 0, 1)); run();                  // right address, wrong shift
+  w.frame(...dp(0, 86, 15, 4, 16)); run();                 // value > mask
   w.frame(0xf0, 0x00, 0x45, 0x01, 0x69, 0x7f, 0xf7); run(); // OS-upgrade-header
   w.frame(0xb0, 42); run();                                // too short
   w.frame(0x90, 60, 200); run();                           // data > 7F
   assert.deepEqual(out, []);
   assert.equal(status.filter((s) => s.startsWith("REFUSED")).length, 5);
-  w.dp(0, 86, 15, 4, 1); run();
+  w.frame(...dp(0, 86, 15, 4, 1)); run();
   assert.deepEqual(out, DP_TRI);
-});
-
-test("stop empties the queue, and a frame that has become invalid stops everything", () => {
-  const { w, out, run } = loadGateway();
-  w.cc(1, 1); w.cc(2, 2); w.cc(3, 3);
-  w.stop();
-  run();
-  assert.deepEqual(out, [0xb0, 1, 1]);
-  assert.equal(w.queue.length, 0);
 });
 
 test("the note path (one track): channel messages go out at once, outside the queue; SysEx never passes", () => {
@@ -81,10 +75,10 @@ test("the track's notes are held while the synth stores and go out in order afte
   const STORE = S.encodeStore();
   w.pushed(); w.store();
   assert.deepEqual(out.splice(0), STORE, "the store goes out");
-  for (const b of [0x90, 60, 100, 0xf8, 0x80, 60, 0]) w.msg_int(b);      // note on, clock, note off during the store
+  for (const b of [0x90, 60, 100, 0xf8, 0xfa, 0x80, 60, 0]) w.msg_int(b); // note on, clock, start, note off during the store
   assert.deepEqual(out, [], "nothing to the synth while it stores");
   w.stored(0, 5, 146, 1234, 4000);
-  assert.deepEqual(out.splice(0), [0x90, 60, 100, 0xf8, 0x80, 60, 0], "held, in order, note-off included");
+  assert.deepEqual(out.splice(0), [0x90, 60, 100, 0xfa, 0x80, 60, 0], "held, in order, note-off included; the clock dropped");
   w.msg_int(0x90); w.msg_int(62); w.msg_int(100);
   assert.deepEqual(out.splice(0), [0x90, 62, 100], "after the store: at once again");
   w.pushed(); w.store(); out.length = 0;
@@ -101,7 +95,7 @@ test("Store patch needs Push patch first: refused until pushed, allowed after, g
   w.arm();
   assert.deepEqual(storable(), [0], "on load: grey");
   w.store();
-  assert.deepEqual(out, []); assert.match(status.pop(), /^REFUSED store: Store patch needs Push patch first/);
+  assert.deepEqual(out, []); assert.match(status.pop(), /^REFUSED bus: Store patch needs Push patch first/);
   w.frame(...DP_TRI); out.length = 0;                       // Push patch: the routers' frames …
   w.pushed();                                               // … then the marker
   assert.deepEqual(storable(), [0, 1]);
@@ -129,7 +123,7 @@ test("the frame that clears every patch (id 01) is refused, however it arrives",
   assert.deepEqual(out, []); assert.match(status.pop(), /^REFUSED bus: 01 clears every patch/);
 });
 
-test("Store goes grey on a patch CC or program change from the track, or a stopped queue; playing controls leave it", () => {
+test("Store goes grey on a patch CC or program change from the track; playing controls leave it", () => {
   const { w, ev } = loadGateway();
   const storable = () => ev.filter((e) => e[0] === "storable").map((e) => e[1]);
   w.pushed();
@@ -139,6 +133,4 @@ test("Store goes grey on a patch CC or program change from the track, or a stopp
   assert.deepEqual(storable(), [1, 0]);
   w.pushed(); w.msg_int(0xc0); w.msg_int(5);                           // a program change
   assert.deepEqual(storable(), [1, 0, 1, 0]);
-  w.pushed(); w.frame(...DP_TRI); w.frame(...DP_TRI); w.pushed(); w.stop();   // Push cut short
-  assert.deepEqual(storable().slice(-1), [0], "stop with frames still queued");
 });

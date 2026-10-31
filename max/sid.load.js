@@ -94,6 +94,7 @@ function patch() {
     const b = []; let term = false;
     while (i < p.length && b.length < 130) {
       if (p[i] === 0xff) { b.push(0xff); i++; term = true; break; }
+      if (i + 1 >= p.length) { sidlog("load", "table", t, "cut off in the middle of a step"); i++; term = true; break; }
       b.push(p[i], p[i + 1]);
       if (p[i] === 0xfe) { i += 2; term = true; break; }
       i += 2;

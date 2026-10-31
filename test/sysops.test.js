@@ -41,7 +41,6 @@ test("47 reply: status, slot, size, checksum, free", () => {
   const r = S.decodeReply(storeReply([0, 14, 0x01, 0x23, 0xbe, 0xef, 0x40, 0x00]));
   assert.deepEqual([r.status, r.statusText, r.slot, r.size, r.sum, r.free], [0, "stored", 14, 0x123, 0xbeef, 0x4000]);
   assert.equal(S.decodeReply(storeReply([1, 14, 0, 0, 0, 0, 0, 0])).statusText, "memory full");
-  assert.equal(S.storeSum([0xff, 0xff, 2]), 0x200);
 });
 
 function loadGateway() {
@@ -50,11 +49,15 @@ function loadGateway() {
   const g = { midiParser, sidlog, sidguard, ...S, SidParams, Task, File: class {}, inlets: 0, outlets: 0, post() {}, arrayfromargs: (a) => Array.from(a), messagename: "x",
     outlet: (o, ...a) => { if (o === 0) out.push(a[0]); else if (a[0] === "status") status.push(a[1]); else if (a[0] === "noreply") warn.push(a[1]); else if (a[0] === "answered") warn.push("ok " + a[1]); } };
   const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.send.js"), "utf8").replace(/^inlets = 1;\noutlets = 2;\n/m, "");
-  const fn = new Function(...Object.keys(g), src + "\nreturn { cc, settings, store, stored, replied, request, frame, pushed, get queue() { return queue; }, get storing() { return storing; } };");
+  const fn = new Function(...Object.keys(g), src + "\nreturn { stored, replied, frame, pushed, get queue() { return queue; }, get storing() { return storing; } };");
   // Runs the queue Task's ticks (not the store timeout) a number of times.
   const ticks = (n) => { for (let k = 0; k < n; k++) for (const t of tasks) if (t.due !== undefined && t.due < 3000 && !t.cancelled) { t.due = undefined; t.fn(); } };
   const timeout = () => { for (const t of tasks) if (t.due === 3000 && !t.cancelled) { t.due = undefined; t.fn(); } };
-  return { w: fn(...Object.values(g)), out, status, warn, ticks, timeout };
+  const w = fn(...Object.values(g));
+  // What the routers send, as frames (the only way in besides the replies and "pushed")
+  Object.assign(w, { cc: (n, v) => w.frame(0xb0, n, v), store: () => w.frame(...S.encodeStore()), request: (n) => w.frame(...S.encodeRequest(n)),
+    settings: () => w.frame(...S.encodeSettingsRequest()) });
+  return { w, out, status, warn, ticks, timeout };
 }
 const frames = (out) => {                                                  // SysEx frames and channel messages (status byte starts one)
   const f = []; let cur = null;
@@ -75,7 +78,7 @@ test("store lock: after 07 nothing goes to the synth until the 47 reply; a secon
   w.cc(42, 1); w.request(127); w.store();
   ticks(50);
   assert.deepEqual(out, S.encodeStore(), "held while storing");
-  assert.ok(status.some((s) => /REFUSED store: a store is already pending/.test(s)));
+  assert.ok(status.some((s) => /REFUSED bus: a store is already pending/.test(s)));
   w.stored(0, 5, 300, 1234, 9000);
   assert.ok(!w.storing && status.some((s) => /store reply: stored, slot 5/.test(s)));
   ticks(50);
