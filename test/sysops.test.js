@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const { midiParser } = require("../lib/midi");
 const fs = require("fs");
 const path = require("path");
-const { sidlog, sidguard, sidUserPaths } = require("../lib/maxlog");
+const { sidlog, sidguard } = require("../lib/maxlog");
 const S = require("../lib/sysex");
 const SidParams = require("../lib/params");
 
@@ -46,7 +46,7 @@ test("47 reply: status, slot, size, checksum, free", () => {
 function loadGateway() {
   const out = [], status = [], tasks = [], warn = [];
   class Task { constructor(fn) { this.fn = fn; tasks.push(this); } schedule(ms) { this.due = ms; this.cancelled = false; } cancel() { this.cancelled = true; } }
-  const g = { midiParser, sidlog, sidguard, ...S, SidParams, Task, File: class {}, inlets: 0, outlets: 0, post() {}, arrayfromargs: (a) => Array.from(a), messagename: "x",
+  const g = { midiParser, sidlog, sidguard, ...S, SidParams, Task, inlets: 0, outlets: 0, post() {}, arrayfromargs: (a) => Array.from(a), messagename: "x",
     outlet: (o, ...a) => { if (o === 0) out.push(a[0]); else if (a[0] === "status") status.push(a[1]); else if (a[0] === "noreply") warn.push(a[1]); else if (a[0] === "answered") warn.push("ok " + a[1]); } };
   const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.send.js"), "utf8").replace(/^inlets = 1;\noutlets = 2;\n/m, "");
   const fn = new Function(...Object.keys(g), src + "\nreturn { stored, replied, frame, pushed, get queue() { return queue; }, get storing() { return storing; } };");
@@ -116,11 +116,11 @@ test("settings: 06 passes the gateway; a stray reply without a store does nothin
   w.stored(0, 1, 2, 3, 4); assert.ok(!w.storing);
 });
 
-test("the capture passes 46/47 on as settings/stored and does not save them; sid.load sends the rate to the playheads and the LFO views", () => {
+test("the capture passes 46/47 on as settings/stored; sid.load sends the rate to the playheads and the LFO views", () => {
   const sent = [], logs = [];
-  const g = { SID_DEV: false, midiParser, sidlog: (...a) => logs.push(a.join(" ")), sidguard, sidUserPaths, ...S, inlets: 0, outlets: 0, post() {}, arrayfromargs: (a) => Array.from(a),
-    outlet: (o, ...a) => sent.push([o].concat(a)), File: class { constructor() { throw new Error("must not save a reply"); } } };
-  const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.capture.js"), "utf8").replace(/^inlets = 1;\noutlets = 2;\n/m, "");
+  const g = { midiParser, sidlog: (...a) => logs.push(a.join(" ")), sidguard, ...S, inlets: 0, outlets: 0, post() {}, arrayfromargs: (a) => Array.from(a),
+    outlet: (o, ...a) => sent.push([o].concat(a)) };
+  const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.capture.js"), "utf8").replace(/^inlets = 1;\noutlets = 1;\n/m, "");
   const cap = new Function(...Object.keys(g), src + "\nreturn { msg_int };")(...Object.values(g));
   for (const b of settingsReply(SETTINGS)) cap.msg_int(b);
   for (const b of storeReply([1, 7, 0, 0x92, 0, 0, 0, 0x10])) cap.msg_int(b);
@@ -139,9 +139,9 @@ test("the capture passes 46/47 on as settings/stored and does not save them; sid
 
 test("capture (built into SidStation, hears all SysEx): a foreign or short frame is logged and ignored – no crash, no file, no output", () => {
   const sent = [], logs = [];
-  const g = { SID_DEV: false, midiParser, sidlog: (...a) => logs.push(a.join(" ")), sidguard, sidUserPaths, ...S, inlets: 0, outlets: 0, post() {}, arrayfromargs: (a) => Array.from(a),
-    outlet: (o, ...a) => sent.push([o].concat(a)), File: class { constructor() { throw new Error("must not save a foreign frame"); } } };
-  const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.capture.js"), "utf8").replace(/^inlets = 1;\noutlets = 2;\n/m, "");
+  const g = { midiParser, sidlog: (...a) => logs.push(a.join(" ")), sidguard, ...S, inlets: 0, outlets: 0, post() {}, arrayfromargs: (a) => Array.from(a),
+    outlet: (o, ...a) => sent.push([o].concat(a)) };
+  const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.capture.js"), "utf8").replace(/^inlets = 1;\noutlets = 1;\n/m, "");
   const cap = new Function(...Object.keys(g), src + "\nreturn { msg_int };")(...Object.values(g));
   for (const b of [0xf0, 0x7d, 0x53, 0x49, 0x44, 0xf7]) cap.msg_int(b);                          // a non-commercial test frame (7D)
   for (const b of [0xf0, 0x47, 0x7f, 0x15, 0x60, 0x00, 0x04, 0x41, 0x09, 0x00, 0x00, 0xf7]) cap.msg_int(b);   // another maker's SysEx
@@ -149,6 +149,6 @@ test("capture (built into SidStation, hears all SysEx): a foreign or short frame
   assert.equal(logs.filter((l) => /not a SidStation frame/.test(l)).length, 2);
   assert.deepEqual(logs.filter((l) => /ERROR/.test(l)), []);
   for (const b of S.encodeDP(0x1a, 0x7f, 0, 90)) cap.msg_int(b);                                 // our own DP looping back
-  assert.deepEqual(sent, [], "not passed on, not saved (File throws)");
+  assert.deepEqual(sent, [], "not passed on");
   assert.ok(logs.some((l) => /ERROR outgoing-type frame \(id 04\)/.test(l)));
 });

@@ -39,9 +39,8 @@ All notable changes to SidStation Editor are listed here, newest first. The form
   cannot crowd out the held notes.
 - The log file's folder is now named after the editor: create `Library/Logs/SidStation-Editor`
   (macOS) or `Documents\SidStation-Editor\logs` (Windows) in your home folder to get `max.log`.
-- A release no longer saves received patch dumps as `.syx` files; only a development build does,
-  in `Documents/SidStation-Editor/dumps`. The README's Data folders section is gone; the log is
-  described under Development.
+- Received patch dumps are no longer saved as `.syx` files; the log gets their bytes as one line.
+  The README's Data folders section is gone; the log is described under Development.
 
 ### Fixed
 

@@ -183,8 +183,7 @@ Node 24 or later.
 
 For troubleshooting the editor also writes its log to a file, `max.log`, once you have created its folder in your
 home folder: `Library/Logs/SidStation-Editor` on macOS (Library is hidden in Finder: Go → Go to Folder… and type
-`~/Library/Logs`), `Documents\SidStation-Editor\logs` on Windows. A development build (`npm run build`) also saves
-every patch dump it receives as `.syx` in `Documents/SidStation-Editor/dumps`, if that folder exists.
+`~/Library/Logs`), `Documents\SidStation-Editor\logs` on Windows.
 
 Why a build step: the device is not drawn in Max but described in `build/`, which places every
 control and writes the `.amxd`. Each `v8` object in Max loads one file, so the build joins the

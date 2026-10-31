@@ -11,7 +11,7 @@ const SidParams = require("../lib/params");
 function loadGateway() {
   const out = [], status = [], sched = [], logs = [], ev = [];
   class Task { constructor(fn) { this.fn = fn; } schedule(ms) { sched.push([this, ms]); } cancel() { this.cancelled = true; } }
-  const g = { midiParser, sidlog: (tag, ...a) => { logs.push(a.join(" ")); sidlog(tag, ...a); }, sidguard, ...S, SidParams, Task, File: class {}, inlets: 0, outlets: 0, post() {}, arrayfromargs: (a) => Array.from(a), messagename: "x",
+  const g = { midiParser, sidlog: (tag, ...a) => { logs.push(a.join(" ")); sidlog(tag, ...a); }, sidguard, ...S, SidParams, Task, inlets: 0, outlets: 0, post() {}, arrayfromargs: (a) => Array.from(a), messagename: "x",
     outlet: (o, ...a) => { if (o === 0) out.push(a[0]); else { ev.push(a); if (a[0] === "status") status.push(a[1]); } } };
   const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.send.js"), "utf8").replace(/^inlets = 1;\noutlets = 2;\n/m, "");
   const fn = new Function(...Object.keys(g), src + "\nreturn { frame, msg_int, stored, pushed, arm, get queue() { return queue; } };");
