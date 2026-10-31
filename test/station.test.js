@@ -293,7 +293,8 @@ test("SidStation: the Version parameter is stored only, off screen and off Push,
   assert.equal(vo.parameter_longname, "Version");
   assert.equal(vo.parameter_invisible, 1, "stored in the set, not automated");
   assert.equal(vo.parameter_mmax, 999999);
-  assert.deepEqual([vo.parameter_initial_enable, vo.parameter_initial], [1, [0]], "a new device restores 0");
+  const [maj, min, pat] = version.split(".").map(Number);
+  assert.deepEqual([vo.parameter_initial_enable, vo.parameter_initial], [1, [maj * 10000 + min * 100 + pat]], "a new device restores its own version: nothing to write");
   assert.ok(!box.box.presentation, "not on screen");
   for (const b of Object.values(p.parameters.parameterbanks)) assert.ok(!b.parameters.includes("Version"), b.name + ": not on Push");
   const [js] = from(box.box.id); assert.match(text(js), new RegExp("^v8 sid\\.version\\.js " + version.replace(/\./g, "\\.") + "(-dev)?$"), "the build's version, -dev unless built for a release");
@@ -329,21 +330,7 @@ test("SidStation: the Push table knobs are visible on Push only (not automated, 
   }
 });
 
-test("SidStation: the Ready parameter ([ready] convention) is visible to Live, off screen and off Push, 0 at load and 1 two seconds after the arm", () => {
+test("SidStation: no Ready parameter (its change after load was a step in Live's undo history)", () => {
   const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", NAME + ".amxd")).json.patcher;
-  const text = (id) => (p.boxes.find((b) => b.box.id === id) || { box: {} }).box.text;
-  const into = (id) => p.lines.filter((l) => l.patchline.destination[0] === id).map((l) => l.patchline.source[0]);
-  const box = p.boxes.find((b) => b.box.varname === "d_ready").box, vo = box.saved_attribute_attributes.valueof;
-  assert.equal(vo.parameter_longname, "Ready");
-  assert.equal(vo.parameter_invisible, 0, "visible to Live's API");
-  assert.deepEqual([vo.parameter_initial_enable, vo.parameter_initial, vo.parameter_mmax], [1, [0], 1]);
-  assert.match(box.annotation, /\[ready\]$/);
-  assert.ok(!box.presentation, "not on screen");
-  for (const b of Object.values(p.parameters.parameterbanks)) assert.ok(!b.parameters.includes("Ready"), b.name + ": not on Push");
-  const feeds = into(box.id).map(text).sort();
-  assert.deepEqual(feeds, ["0", "1"]);
-  const one = into(box.id).find((id) => text(id) === "1"), zero = into(box.id).find((id) => text(id) === "0");
-  assert.equal(text(into(one)[0]), "delay 2000"); assert.equal(text(into(into(one)[0])[0]), "delay 300", "2 s after the arm");
-  assert.equal(text(into(zero)[0]), "loadbang");
-  assert.deepEqual(p.lines.filter((l) => l.patchline.source[0] === box.id), [], "drives nothing");
+  assert.ok(!p.boxes.some((b) => b.box.varname === "d_ready"));
 });

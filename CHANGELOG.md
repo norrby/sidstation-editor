@@ -7,12 +7,6 @@ All notable changes to SidStation Editor are listed here, newest first. The form
 
 ## [Unreleased]
 
-### Added
-
-- **Ready**, a parameter that turns from loading to ready about 2 seconds after the device loads,
-  once Live has handed it the set's values. A program driving the editor through Live's API waits
-  for it; its help text ends with [ready], the mark Live MCP looks for.
-
 ### Changed
 
 - **Store patch is greyed until Push patch has been pressed**, and greyed again by any change after
@@ -44,6 +38,11 @@ All notable changes to SidStation Editor are listed here, newest first. The form
 
 ### Fixed
 
+- **A newly added editor can be undone away again.** On load it set a Push knob of each
+  oscillator's waveform table (Table Note) although the table was empty; every such write is a step
+  in Live's undo history, and each Cmd+Z made the editor write it back, so the device never went
+  away. Now a new editor changes none of its own parameters on load, and one Cmd+Z removes it, as
+  with any other device.
 - Loading a set where an oscillator's Pitch was set to Note sent that note to the synth. Pitch
   (Key follow | Note) and its note are two Live parameters for one synth setting, and only the
   first of them counted as restored.

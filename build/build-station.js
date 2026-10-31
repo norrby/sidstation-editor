@@ -37,6 +37,8 @@ const DEVICE = require("../package.json").productName;
 // overview's help text, the description, the name display's title, the log); only "npm run release" (--release) builds the plain version.
 const RELEASE = process.argv.includes("--release");
 const VERSION = require("../package.json").version + (RELEASE ? "" : "-dev");
+// The version as the Version parameter holds it, major * 10000 + minor * 100 + patch (as encode() in max/sid.version.js).
+const versionCode = (v) => { const m = /^(\d+)\.(\d+)\.(\d+)/.exec(v); return Number(m[1]) * 10000 + Number(m[2]) * 100 + Number(m[3]); };
 function buildDevice(title) {
   const json = A.midiEffectSkeleton(title, 100);
   const p = json.patcher;
@@ -72,26 +74,16 @@ function buildDevice(title) {
   lines.push(A.line(vLayout, 0, vThis, 0), A.line(vLayout, 1, vWDefer, 0), A.line(vWDefer, 0, vThisDev, 0),
     A.line(vThisDev, 0, vDelay, 0), A.line(vDelay, 0, vArm, 0), A.line(vDelay, 0, vKick, 0), A.line(vKick, 0, vLayout, 0));
   // The version in the set: a hidden parameter (stored only, no automation, in no bank) holds the version that last had the set,
-  // so the log can say what a set was saved with. On load Live restores it (0 for a new device or an older set) -> sid.version.js
-  // logs that and writes the device's own version back after 50 ms. Long parameter names never change after a release: Live
+  // so the log can say what a set was saved with. Its initial value is the build's own version, so a new device writes nothing (every
+  // write is a step in Live's undo history, and a new device should go away on one Cmd+Z). On load Live restores it -> sid.version.js
+  // logs that and writes the device's own version back after 50 ms only if it differs (a set saved with another version, or before 0.3.2). Long parameter names never change after a release: Live
   // restores a set's values by them, so a renamed parameter would lose its value in every saved set.
   const vVer = id(), vVerJs = id();
   boxes.push(live(vVer, "live.numbox", [1300, 30, 70, 18], null, { parameter_longname: "Version", parameter_shortname: "Version",
       parameter_type: 0, parameter_mmin: 0, parameter_mmax: 999999, parameter_unitstyle: 0, parameter_invisible: 1,   // float: an int came back as 255 (clipped to 8 bits somewhere)
-      parameter_modmode: 0, parameter_initial_enable: 1, parameter_initial: [0], parameter_visible_undoable: 0 }, {}, "d_version"),
+      parameter_modmode: 0, parameter_initial_enable: 1, parameter_initial: [versionCode(VERSION)], parameter_visible_undoable: 0 }, {}, "d_version"),
     A.obj(vVerJs, "v8 sid.version.js " + VERSION, [1300, 60, 150, 20], 1, [""]));
   lines.push(A.line(vVer, 0, vVerJs, 0), A.line(vVerJs, 0, vVer, 0));
-  // Ready: the [ready] convention of Live MCP (its help text ends with "[ready]"). 0 from load (loadbang, so a saved set's 1 does
-  // not count), 1 once the editor can be driven: Live delivers its restored values into the patch for up to ~1.5 s after the arm
-  // (seen in the log: "first value kept" lines after "armed"), and a value written before Live's own restore of that parameter
-  // would be taken as the restore and Live's value applied after it. So 2 s after the arm. Off screen, in no bank, no undo; it
-  // must be visible to Live's API (invisible 0) for a program to read it. It drives nothing: writing it changes nothing.
-  const vReady = id(), vReady0 = id(), vReady1 = id(), vReadyDelay = id();
-  boxes.push(live(vReady, "live.toggle", [1300, 100, 15, 15], null, { parameter_longname: "Ready", parameter_shortname: "Ready",
-      parameter_type: 2, parameter_enum: ["loading", "ready"], parameter_mmax: 1, parameter_invisible: 0, parameter_modmode: 0,
-      parameter_initial_enable: 1, parameter_initial: [0], parameter_visible_undoable: 0 }, {}, "d_ready"),
-    A.msg(vReady0, "0", [1330, 100, 20, 20]), A.msg(vReady1, "1", [1360, 100, 20, 20]), A.obj(vReadyDelay, "delay 2000", [1360, 75, 70, 20], 1, ["bang"]));
-  lines.push(A.line(vLoad, 0, vReady0, 0), A.line(vReady0, 0, vReady, 0), A.line(vDelay, 0, vReadyDelay, 0), A.line(vReadyDelay, 0, vReady1, 0), A.line(vReady1, 0, vReady, 0));
 
   // panels in a row; x0 = position in the full layout
   const panels = [];

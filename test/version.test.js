@@ -26,13 +26,13 @@ test("version: encode/decode", () => {
   assert.equal(v.encode("garbage"), 0);
 });
 
-test("version: a new device (restore 0) is stamped after 50 ms, and the stamp coming back changes nothing", () => {
+test("version: a set saved before the version was kept (restore 0) is stamped after 50 ms, and the stamp coming back changes nothing", () => {
   const { v, out, tasks, logs, run } = load("0.3.2");
   v.msg_float(0);
   assert.equal(out.length, 0, "nothing in the same event");
   assert.equal(tasks.length, 1);
   assert.equal(tasks[0][1], 50);
-  assert.match(logs.at(-1), /new device, or a set saved before.*device is 0\.3\.2/);
+  assert.match(logs.at(-1), /set saved before the version was kept; device is 0\.3\.2/);
   run();
   assert.deepEqual(out, [302]);
   v.msg_float(302);                                                    // the parameter echoes the stamp
@@ -60,7 +60,7 @@ test("version: an older set is logged with its version and stamped; the same ver
   assert.deepEqual(a.out, [302]);
   const b = load("1.0.0");
   b.v.msg_float(10000);
-  assert.match(b.logs.at(-1), /set saved with 1\.0\.0, same as the device/);
+  assert.match(b.logs.at(-1), /new device, or a set saved with 1\.0\.0, same as the device/);
   assert.equal(b.tasks.length, 0);
   assert.deepEqual(b.out, []);
 });

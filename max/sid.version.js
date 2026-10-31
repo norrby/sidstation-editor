@@ -1,9 +1,11 @@
 // sid.version.js – v8: the editor's version, kept in the Live Set. Argument: the version from package.json (the build).
 // Bundled with lib/maxlog.js (dist/sid.version.js).
 // In:  the hidden Version parameter (a live.numbox, stored only, no automation): its first value is what Live restores when the
-//      set loads – 0 for a new device, or a set saved before the version was kept. It is logged, and then the device's own
-//      version goes back into the parameter after 50 ms (a value sent in the same event as Live's own update never reaches
-//      Live), so a saved set says which version last had it. Nothing else happens: no migration, nothing to the synth.
+//      set loads – the build's own version for a new device (the parameter's initial value), the saved one for a set, 0 for a set
+//      saved before the version was kept. It is logged, and if it is not the device's own version, that goes back into the
+//      parameter after 50 ms (a value sent in the same event as Live's own update never reaches Live), so a saved set says which
+//      version last had it. Only then: every write is a step in Live's undo history, and a new device must go away on one Cmd+Z.
+//      Nothing else happens: no migration, nothing to the synth.
 // Out: outlet 0 -> the Version parameter: the device's version as a number, major * 10000 + minor * 100 + patch
 //      (0.3.2 = 302, 1.0.0 = 10000).
 
@@ -23,9 +25,9 @@ function msg_float(v) {
   if (!Number.isFinite(n)) return;
   if (!seen) {
     seen = true;
-    sidlog("version", n === CODE ? "set saved with " + VERSION + ", same as the device"
+    sidlog("version", n === CODE ? "new device, or a set saved with " + VERSION + ", same as the device"
       : n > 0 ? "set saved with " + decode(n) + ", device is " + VERSION
-      : "new device, or a set saved before the version was kept; device is " + VERSION);
+      : "set saved before the version was kept; device is " + VERSION);
   }
   if (n === CODE) return;
   if (stamped) { sidlog("version", "the parameter holds " + n + " after " + CODE + " was written: not kept"); return; }
