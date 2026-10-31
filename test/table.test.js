@@ -181,18 +181,28 @@ test("push: the first value per knob (the restore on load) is kept, not applied;
   assert.equal(logs.filter((l) => /first value .* kept/.test(l)).length, KEYS.length);
   assert.equal(w.n, 2); assert.equal(last(out), "bytes 16 60 32 255 255", "the table is untouched");
   w.bytes(0x10, 0x3c, 0x20, 0xff, 0xff);
-  assert.deepEqual([knob(out, "step"), knob(out, "wave"), knob(out, "pitch"), knob(out, "note"), knob(out, "len")], ["knob step 0", "knob wave 0", "knob pitch 1", "knob note 60", "knob len 2"]);
+  assert.deepEqual([knob(out, "step"), knob(out, "wave"), knob(out, "pitch"), knob(out, "note"), knob(out, "len")], [undefined, undefined, "knob pitch 1", "knob note 60", "knob len 2"],
+    "only the knobs that differ from Live's restore (0) are written");
   const tables = () => out.filter((s) => s.startsWith("bytes")).length, nb = tables();
   w.push("step", 1);                                                        // the knobs that differ from step 0 follow; Step itself is not echoed
-  assert.deepEqual([knob(out, "step"), knob(out, "wave"), knob(out, "pitch")], ["knob step 0", "knob wave 1", "knob pitch 0"]);
+  assert.deepEqual([knob(out, "step"), knob(out, "wave"), knob(out, "pitch")], [undefined, "knob wave 1", "knob pitch 0"]);
   assert.equal(tables(), nb, "moving the cursor sends no table");
   w.push("wave", 4); w.push("mod", 1); w.push("offset", -5);
   assert.deepEqual([w.steps[1].wave, w.steps[1].sync, w.steps[1].mode, w.steps[1].rel], [4, 1, "rel", -5]);
   assert.equal(last(out), "bytes 16 60 130 133 255");                      // 82 = Noise + sync, 85 = subtract 5
   assert.equal(knob(out, "pitch"), "knob pitch 2");                          // the pitch knob followed the offset
-  assert.deepEqual(out.filter((s) => s.startsWith("bank ")), ["bank 0", "bank 1"], "the slot after Pitch: Note at first, Offset once the step is relative");
+  assert.deepEqual(out.filter((s) => s.startsWith("bank ")), ["bank 1"], "the slot after Pitch: Note as built (not sent: every bank edit is an undo step in Live), Offset once the step is relative");
   w.push("note", 48); assert.deepEqual([w.steps[1].mode, w.steps[1].fixed], ["F", 48]); assert.equal(last(out), "bytes 16 60 130 48 255");
   w.push("pitch", 0); assert.equal(last(out), "bytes 16 60 130 255 255");
+});
+
+test("a new device writes no knob and no bank (each is an undo step in Live), and an undo of a knob beyond the table is not written back", () => {
+  const { w, out } = loadWidget();
+  w.bytes(0xff);                                                             // an empty table, as a new device restores it
+  restore(w); w.bang();                                                      // Live's restore, then the resync
+  assert.deepEqual(out.filter((s) => /^(knob|bank)/.test(s)), [], "nothing written on load");
+  w.push("note", 0);                                                         // Cmd+Z turned a knob: refused, and not answered with a write
+  assert.deepEqual(out.filter((s) => /^(knob|bank)/.test(s)), []);
 });
 
 test("push: Length grows and shrinks the table, keeps Loop below 65 and clamps the cursor's edits to the table", () => {

@@ -80,7 +80,9 @@ let drag = null, hover = -1, msg = "", off = 0;   // off: the first visible colu
 // Push edits one step at a time, the one under the cursor. Every knob outputs a value when the device loads (Live's restore, as
 // with every live.* object, also for a parameter that is not stored), and that first value per knob is never applied: with a
 // table it would overwrite step 0 and set the length to 0. The same rule as the routers' (sid.osc.js param).
-let cursor = 0, bankShown = -1, bankLoopShown = -1;   // bankShown: 0 Note or 1 Offset in the bank; bankLoopShown: Loop To shown; -1 not told yet
+// bankShown: 0 Note or 1 Offset in the bank; bankLoopShown: Loop To shown. They start as the build made the bank (Note, Speed): every
+// "edit" to live.banks is a step in Live's undo history, so one sent on load kept a new device from going away on Cmd+Z.
+let cursor = 0, bankShown = 0, bankLoopShown = 0;
 let loopToShown = false;                            // Loop To is in the bank: from a Loop turn that loops until another knob is turned
 const pushSeen = {}, knobVal = {};                 // knobVal: what each knob holds now (from Push or from knobs()), so only a change is sent
 let syncing = false;                               // knobs() is sending: what comes back is our own echo
@@ -372,13 +374,17 @@ function push(key, v) {
   msg = describe(cursor); changed();
 }
 // The knobs follow the step under the cursor: "knob <key> <v>" -> [prepend set] -> the hidden parameter, silently.
+// Every value written to a knob is a step in Live's undo history (despite Undo When Visible off), and undoing it turns the knob,
+// which comes back here as "push". With no step under the cursor the step's knobs are left alone: a new device's empty table wrote
+// Note 48 on load, each Cmd+Z turned it back to 0, and the refusal wrote 48 again – the device could never be undone away.
+// A knob that has not had its first value yet is not written either: Live's restore comes after and overwrites it.
 function knobs() {
-  const s = steps[cursor];
+  const s = steps[cursor], stepKnobs = cursor < n ? [["wave", s.wave], ["mod", s.sync | s.ring << 1], ["pitch", PITCH_MODES.indexOf(s.mode)],
+    ["note", clamp(s.fixed, 0, 81)], ["offset", s.rel]] : [];
   syncing = true;
   try {
-    for (const [k, v] of [["step", cursor], ["wave", s.wave], ["mod", s.sync | s.ring << 1], ["pitch", PITCH_MODES.indexOf(s.mode)],
-      ["note", clamp(s.fixed, 0, 81)], ["offset", s.rel], ["len", n], ["loop", term === "loop" && n < MAXCOL ? 1 : 0], ["target", target]]) {
-      if (knobVal[k] === v) continue;
+    for (const [k, v] of [["step", cursor], ...stepKnobs, ["len", n], ["loop", term === "loop" && n < MAXCOL ? 1 : 0], ["target", target]]) {
+      if (!pushSeen[k] || knobVal[k] === v) continue;                       // before Live's restore of the knob: the resync writes it after
       knobVal[k] = v; outlet(0, "knob", k, v);
     }
   } finally { syncing = false; }
