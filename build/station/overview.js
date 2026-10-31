@@ -69,12 +69,15 @@ function patchColumn(x0, ctx) {
       parameter_modmode: 0, parameter_initial_enable: 1, parameter_initial: [0] },
     {}, "c_slot"), A.obj(vSlotPre, "prepend slot", [3300, 2400 + row * 30, 70, 20]));
   lines.push(A.line(vSlot, 0, vSlotPre, 0), A.line(vSlotPre, 0, vFilter, 0));
-  // Push: sendall to osc 1–3, the filter/common (including the name) and LFO 1–4 (one button for the whole patch)
-  const vBtn = id(), vSel = id(), vSel1 = id(), vMsg = id();
+  // Push: sendall to osc 1–3, the filter/common (including the name) and LFO 1–4 (one button for the whole patch), then "pushed"
+  // to the gateway ([t b b]: right outlet first, so every router has queued its frames before the marker): Store patch is allowed
+  // from then until the next change (build-station.js greys the button on the gateway's "storable 0|1").
+  const vBtn = id(), vSel = id(), vSel1 = id(), vMsg = id(), vPushT = id(), vPushed = id();
   boxes.push(actionButton(vBtn, [3200, 2500, 60, 15], px(SENDALL_RECT), "Push Patch", SENDALL_TEXT, "c_sendall"),
-    A.obj(vSel, "route bang", [3200, 2520, 60, 20]), A.obj(vSel1, "sel 1", [3260, 2520, 40, 20]), A.msg(vMsg, "sendall", [3200, 2545, 50, 20]));
-  lines.push(A.line(vBtn, 0, vSel, 0), A.line(vSel, 0, vMsg, 0), A.line(vSel, 1, vSel1, 0), A.line(vSel1, 0, vMsg, 0));
-  ctx.sendAllId = vMsg;
+    A.obj(vSel, "route bang", [3200, 2520, 60, 20]), A.obj(vSel1, "sel 1", [3260, 2520, 40, 20]), A.obj(vPushT, "t b b", [3200, 2545, 40, 20], 2, ["bang", "bang"]),
+    A.msg(vMsg, "sendall", [3200, 2570, 50, 20]), A.msg(vPushed, "pushed", [3260, 2570, 50, 20]));
+  lines.push(A.line(vBtn, 0, vSel, 0), A.line(vSel, 0, vPushT, 0), A.line(vSel, 1, vSel1, 0), A.line(vSel1, 0, vPushT, 0), A.line(vPushT, 1, vMsg, 0), A.line(vPushT, 0, vPushed, 0));
+  ctx.sendAllId = vMsg; ctx.pushedId = vPushed; ctx.pushId = vPushT;
   items.push({ name: "c_sendall", rect: SENDALL_RECT });
   // Pull: dump request (05 7F, needs a firmware with dump-request support) via the filter router; the reply comes in through the capture and is loaded into the panels
   const vFetch = id(), vFetchSel = id(), vFetchSel1 = id(), vFetchMsg = id();
@@ -83,9 +86,11 @@ function patchColumn(x0, ctx) {
   lines.push(A.line(vFetch, 0, vFetchSel, 0), A.line(vFetchSel, 0, vFetchMsg, 0), A.line(vFetchSel, 1, vFetchSel1, 0), A.line(vFetchSel1, 0, vFetchMsg, 0),
     A.line(vFetchMsg, 0, vFilter, 0));
   items.push({ name: "c_fetch", rect: FETCH_RECT });
-  // Store: 07 7F (needs a firmware with store support) – the synth stores its edit buffer to the current slot; the gateway holds all other
-  // traffic until the 47 reply. Push first to store the editor's settings.
+  // Store: 07 7F (needs a firmware with store support) – the synth stores its edit buffer to the patch number its display shows; the
+  // gateway holds all other traffic until the 47 reply. Greyed (live.text "active 0") until Push patch, and again after any change,
+  // so what is stored is what the editor shows; the gateway refuses a store in that state (also from Patch Action).
   const vStore = id(), vStoreSel = id(), vStoreSel1 = id(), vStoreMsg = id();
+  ctx.storeBtnId = vStore;
   boxes.push(actionButton(vStore, [3400, 2500, 60, 15], px(STORE_RECT), "Store Patch", STORE_TEXT, "c_store"),
     A.obj(vStoreSel, "route bang", [3400, 2520, 60, 20]), A.obj(vStoreSel1, "sel 1", [3460, 2520, 40, 20]), A.msg(vStoreMsg, "store", [3400, 2545, 50, 20]));
   lines.push(A.line(vStore, 0, vStoreSel, 0), A.line(vStoreSel, 0, vStoreMsg, 0), A.line(vStoreSel, 1, vStoreSel1, 0), A.line(vStoreSel1, 0, vStoreMsg, 0),
@@ -106,7 +111,7 @@ function patchColumn(x0, ctx) {
     A.obj(vActSel, "sel 1 2 3", [3560, 2570, 70, 20], 4, ["bang", "bang", "bang", ""]), A.obj(vActDelay, "delay 50", [3500, 2570, 50, 20], 1, ["bang"]),
     A.msg(vActZero, "0", [3500, 2595, 30, 20]));
   lines.push(A.line(vAct, 0, vActSel0, 0), A.line(vActSel0, 1, vActT, 0), A.line(vActT, 1, vActSel, 0), A.line(vActT, 0, vActDelay, 0),
-    A.line(vActDelay, 0, vActZero, 0), A.line(vActZero, 0, vAct, 0), A.line(vActSel, 0, vFetchMsg, 0), A.line(vActSel, 1, vMsg, 0), A.line(vActSel, 2, vStoreMsg, 0));
+    A.line(vActDelay, 0, vActZero, 0), A.line(vActZero, 0, vAct, 0), A.line(vActSel, 0, vFetchMsg, 0), A.line(vActSel, 1, vPushT, 0), A.line(vActSel, 2, vStoreMsg, 0));
   return items;
 }
 

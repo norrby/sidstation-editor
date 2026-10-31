@@ -95,12 +95,13 @@ function buildDevice(title) {
   }
   // note on/off from the router that sees the track's notes -> every table playhead (all three voices start at a note, single mode)
   {
-    const vNote = id(), vNotePre = id(), vPushCC = id();
+    const vNote = id(), vNotePre = id(), vPushCC = id(), vPushCCT = id();
     boxes.push(A.obj(vNote, "route note pushcc", [30, 520, 100, 20], 3, ["", "", ""]), A.obj(vNotePre, "prepend note", [30, 545, 80, 20]),
-      A.msg(vPushCC, "sendall", [140, 545, 60, 20]));
-    lines.push(A.line(oscs[1].vV8, 1, vNote, 0), A.line(vNote, 0, vNotePre, 0), A.line(vNote, 1, vPushCC, 0));
+      A.obj(vPushCCT, "t b b", [140, 530, 40, 20], 2, ["bang", "bang"]), A.msg(vPushCC, "sendall", [140, 555, 60, 20]));
+    lines.push(A.line(oscs[1].vV8, 1, vNote, 0), A.line(vNote, 0, vNotePre, 0), A.line(vNote, 1, vPushCCT, 0), A.line(vPushCCT, 1, vPushCC, 0));
+    ctx.pushCCTriggerId = vPushCCT;                                        // its left outlet -> "pushed" to the gateway (connected with the gateway below)
     for (const n of OSCS) lines.push(A.line(vNotePre, 0, oscs[n].tableId, 0));
-    // CC 119 (SidParams.PUSH_CC) on the track: Push patch, at most every 5 s (sid.osc.js pushCC)
+    // CC 119 (SidParams.PUSH_CC) on the track: Push patch, at most every 5 s (sid.osc.js pushCC), like the button: sendall, then "pushed"
     for (const n of OSCS) lines.push(A.line(vPushCC, 0, oscs[n].vV8, 0));
     lines.push(A.line(vPushCC, 0, vFilter, 0), A.line(vPushCC, 0, vLfo, 0));
   }
@@ -152,18 +153,23 @@ function buildDevice(title) {
     // [midiout] (on to External Instrument). The track's input goes to the capture (dumps saved, patches/replies to the loader
     // and the gateway, nothing global) and to the osc 1 router, which passes notes and drops SysEx (the echo rule).
     const vGate = id(), vCap = id(), vStored = id(), vStoredPre = id(), vCapRoute = id(), vRepliedPre = id(), vGateRoute = id(), vNoReplyPre = id(), vAnsweredPre = id(), vSentMsg = id();
+    const vStoreActive = id(), vStorablePre = id();                        // "storable 0|1" -> the Store button's active state and the overview's notice
     boxes.push(A.obj(vGate, "v8 sid.send.js", [30, 500, 100, 20], 2, ["", ""], { varname: "gateway" }),
       A.obj(vCap, "v8 sid.capture.js", [200, 60, 110, 20], 2, ["", ""], { varname: "capture" }),
       A.obj(vCapRoute, "route stored replied", [200, 90, 120, 20], 3, ["", "", ""]), A.obj(vStoredPre, "prepend stored", [200, 120, 90, 20]),
-      A.obj(vRepliedPre, "prepend replied", [300, 120, 90, 20]), A.obj(vGateRoute, "route noreply answered sent", [140, 530, 160, 20], 4, ["", "", "", ""]), A.obj(vNoReplyPre, "prepend noreply", [140, 560, 100, 20]),
+      A.obj(vRepliedPre, "prepend replied", [300, 120, 90, 20]), A.obj(vGateRoute, "route noreply answered sent storable", [140, 530, 200, 20], 5, ["", "", "", "", ""]), A.obj(vNoReplyPre, "prepend noreply", [140, 560, 100, 20]),
       A.obj(vAnsweredPre, "prepend answered", [250, 560, 100, 20]), A.msg(vSentMsg, "outside", [360, 560, 50, 20]),
+      A.msg(vStoreActive, "active $1", [420, 560, 60, 20]), A.obj(vStorablePre, "prepend storable", [490, 560, 100, 20]),
       A.obj(vStored, "t l l", [320, 90, 40, 20], 2, ["", ""]));
     lines.push(A.line(vMidiin, 0, vCap, 0), A.line(vCap, 0, vStored, 0), A.line(vStored, 1, vRxDefer, 0), A.line(vStored, 0, vCapRoute, 0),
       A.line(vCapRoute, 0, vStoredPre, 0), A.line(vStoredPre, 0, vGate, 0), A.line(vCapRoute, 1, vRepliedPre, 0), A.line(vRepliedPre, 0, vGate, 0),
       A.line(vGate, 1, vGateRoute, 0), A.line(vGateRoute, 0, vNoReplyPre, 0), A.line(vNoReplyPre, 0, ctx.nameId, 0), A.line(vGateRoute, 1, vAnsweredPre, 0), A.line(vAnsweredPre, 0, ctx.nameId, 0),
       A.line(vGateRoute, 2, vSentMsg, 0), A.line(vSentMsg, 0, ctx.nameId, 0),
+      A.line(vGateRoute, 3, vStoreActive, 0), A.line(vStoreActive, 0, ctx.storeBtnId, 0), A.line(vGateRoute, 3, vStorablePre, 0), A.line(vStorablePre, 0, ctx.mapId, 0),
+      A.line(ctx.pushedId, 0, vGate, 0), A.line(ctx.pushCCTriggerId, 0, ctx.pushedId, 0),
       A.line(oscs[1].vV8, 0, vGate, 0), A.line(vGate, 0, vMidiout, 0));
     for (const [r, k] of routers) lines.push(A.line(r, k, vGate, 0));
+    ctx.armTargets.push(vGate);                                            // "arm" on load: the gateway answers "storable 0", so Store starts grey
     // Terminal control (tools/sid.js: cc, dp, request, settings, load/send a bank …) straight into the gateway.
     const vUdp = id();
     boxes.push(A.obj(vUdp, "udpreceive 9871", [140, 500, 100, 20], 1, [""]));
@@ -199,7 +205,7 @@ const LAYOUTS = {};
     + "For a program driving the device through Live's API: every change to a parameter goes to the synth right away. A program must never choose Pull patch or Push patch "
     + "unless the user asks for it, and must never choose Store patch unless the user explicitly asks to store. Pull patch replaces every setting in the editor with the "
     + "synth's current slot; Push patch sends the whole editor state together, for example after a saved set has been loaded (loading sends nothing); Store patch "
-    + "overwrites the synth's current slot for good. Patch Action (None, Pull patch, Push patch, Store patch) presses those buttons and goes back to None by itself. A waveform table is edited through Osc n Table Step, set first in a call of its own, then the step's Table Wave, Mod, "
+    + "overwrites the patch number the synth shows for good, and is allowed only right after Push patch (greyed and refused otherwise). Patch Action (None, Pull patch, Push patch, Store patch) presses those buttons and goes back to None by itself. A waveform table is edited through Osc n Table Step, set first in a call of its own, then the step's Table Wave, Mod, "
     + "Pitch and Note or Offset; Table Length, Loop and Loop To apply to the whole table, which plays only while Table Speed is above 0. Osc n Table Data and Table Clear "
     + "are the editor's own storage. Parameters with the values hidden/shown only show or hide panels and do not change the sound. The patch name is Name 1 to Name 10 "
     + "as ASCII codes and names the device in Live.";

@@ -24,7 +24,12 @@ Not affiliated with or endorsed by Elektron. Use at your own risk.
 - **LFOs 1–4:** type, speed, depth, fade-in, sample & hold, note-on/off sync, with a curve view.
 - **Osc 3 "Mod only"** (the SID's 3OFF): oscillator 3 keeps running for sync and ring modulation
   without being heard.
-- **Push patch** sends the whole editor state to the synth's edit buffer.
+- **Push patch** sends the whole editor state to the synth's edit buffer. Right after it **Store
+  patch** is available: it saves that sound to the patch number the synth's display shows (also
+  while the number flashes, before ENTER), overwriting it for good. Any change in the editor greys
+  Store patch again until the next Push patch, so what is saved is always what the editor shows.
+  Store saves what the synth has, so without Push first it would save the synth's sound, not the
+  editor's; the button is greyed to stop that.
 - **CC 119** (value above 0) on the track, from a clip or a controller button, pushes the patch too,
   at most once every 5 seconds. Put it at the start of a song so the synth plays what the editor
   shows. The editor keeps CC 119 to itself; it never reaches the synth.
@@ -35,8 +40,8 @@ Not affiliated with or endorsed by Elektron. Use at your own risk.
 - Every value is a Live parameter: automation, MIDI mapping and presets work as usual.
 - **Patch Action** is a Live parameter (not on screen) with the choices None, Pull patch, Push patch
   and Store patch: setting it from automation, a MIDI mapping or Live's API does that action and
-  returns it to None. Map a button to it, not a knob: a knob sweeping through the choices does all
-  three.
+  returns it to None. Store patch is refused unless Push patch came right before, like the button.
+  Map a button to it, not a knob: a knob sweeping through the choices does all three.
 - Every parameter has a help text in Live's Info View, also those with no control on screen, and
   the device description tells a program driving the editor through Live's API how to behave:
   edits reach the synth at once, and Pull, Push and Store patch are never chosen unless asked.

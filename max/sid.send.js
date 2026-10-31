@@ -28,6 +28,9 @@
 //   settings        system settings request (06)      store   store the edit buffer to the current slot (07 7F)
 //   stored <status> <slot> <size> <sum> <free>        the 47 reply (from the capture): ends the store lock
 //   replied dump|settings                             a 02/03 dump or a 46 reply came in (from the capture)
+//   pushed          Push patch is done (sent after every router queued its frames): the synth has the editor's sound, Store may go
+//   arm             on load: says the Store state ("storable 0") so the button starts grey
+// "storable 0|1" on outlet 1: Store patch is allowed only right after Push patch (the button is greyed otherwise, see below).
 // Every request that expects an answer is timed (Live can lose its input port, and Pull then just does nothing): 05 -> a dump, 06 -> 46, 07 -> 47. No answer within 3 s: a log line and
 // "noreply <dump|settings|store>" on outlet 1, and "sent" after every router frame (the name display shows NO REPLY until "answered" – any reply – or a click).
 //   frame <bytes…>  a complete message from a router; validated as above
@@ -45,6 +48,15 @@ let storing = null;                          // the store lock: the Task that ti
 const STORE_TIMEOUT_MS = 3000;
 const REPLY_TIMEOUT_MS = 3000;
 const waiting = { dump: null, settings: null };   // the Tasks that time out a 05 / 06 request, or null
+// Store needs Push first. Store writes the synth's edit buffer, not the editor, so it is allowed only while the edit buffer is known
+// to hold the editor's sound: from "pushed" (the Push button or CC 119, which arrives after every router has queued its frames)
+// until anything else goes to the synth or a dump is requested (Pull replaces the editor). A store itself keeps the state, so a
+// sound can be stored to a second patch number. "storable 0|1" on outlet 1 greys the Store button and shows the notice
+// (build-station.js); a store while not storable is refused, also from Patch Action.
+let storable = false;
+function pushed() { storable = true; outlet(1, "storable", 1); status("pushed: the synth has the editor's sound, Store patch saves it to the patch number on the synth"); }
+function touched() { if (!storable) return; storable = false; outlet(1, "storable", 0); }
+function arm() { outlet(1, "storable", storable ? 1 : 0); }
 
 // --- the queue ------------------------------------------------------------------
 
@@ -141,6 +153,7 @@ function accept(m, what) {
       const v = validate(m);
       if (!v.ok) return refuse(what, v.reason);
       if (m[6] === ID_STORE && (storing || queue.some((q) => q[0] === 0xf0 && q[6] === ID_STORE))) return refuse(what, "a store is already pending");
+      if (m[6] === ID_STORE && !storable) return refuse(what, "Store patch needs Push patch first");
     }
   } else {
     const len = CH_LEN[m[0] >> 4];
@@ -181,6 +194,7 @@ function send() {
   stop(false);
   sentFrames = 0; totalFrames = bank.length;
   status("sending " + bank.length + " frames …");
+  touched();
   for (const fr of bank) accept(fr.slice(), "bank");
 }
 
@@ -197,16 +211,16 @@ function channel(n) { chan = Math.max(1, Math.min(16, n | 0)); status("channel "
 
 // --- single messages ---------------------------------------------------
 
-function cc(nr, value) { if (accept([0xb0 | (chan - 1), nr | 0, value | 0], "cc")) status("CC " + (nr | 0) + " = " + (value | 0)); }
+function cc(nr, value) { if (accept([0xb0 | (chan - 1), nr | 0, value | 0], "cc")) { touched(); status("CC " + (nr | 0) + " = " + (value | 0)); } }
 function note(pitch, velocity) { accept([0x90 | (chan - 1), pitch | 0, velocity | 0], "note"); }
-function pc(program) { if (accept([0xc0 | (chan - 1), program | 0], "pc")) status("Program Change " + (program | 0)); }
+function pc(program) { if (accept([0xc0 | (chan - 1), program | 0], "pc")) { touched(); status("Program Change " + (program | 0)); } }
 function dp(ph, pl, mask, shift, value) {
   const f = SID_HEADER.concat([ID_DP, ph | 0, pl | 0, mask | 0, shift | 0, value | 0, 0xf7]);
-  if (accept(f, "dp")) status("DP " + (ph | 0) + " " + (pl | 0) + " " + (mask | 0) + " " + (shift | 0) + " = " + (value | 0));
+  if (accept(f, "dp")) { touched(); status("DP " + (ph | 0) + " " + (pl | 0) + " " + (mask | 0) + " " + (shift | 0) + " = " + (value | 0)); }
 }
 function request(slot) {
   const s = (slot | 0) === 127 || (slot | 0) < 0 ? 0x7f : slot | 0;
-  if (accept(SID_HEADER.concat([ID_REQUEST, s, 0xf7]), "request")) status("request dump " + (s === 0x7f ? "current" : s));
+  if (accept(SID_HEADER.concat([ID_REQUEST, s, 0xf7]), "request")) { touched(); status("request dump " + (s === 0x7f ? "current" : s)); }
 }
 function settings() { if (accept(encodeSettingsRequest(), "settings")) status("settings requested"); }
 function store() { if (accept(encodeStore(), "store")) status("store queued (current slot)"); }
@@ -243,11 +257,12 @@ function msg_int(b) { midiIn(b); }                                   // a declar
 function frame() {
   const m = arrayfromargs(arguments).map(Number);
   if (!accept(m, "bus")) return;
+  if (!(m[0] === 0xf0 && (m[6] === ID_STORE || m[6] === ID_SETTINGS))) touched();   // a store or a settings request changes nothing
   status("bus: " + (m[0] === 0xf0 ? "DP " + m.slice(7, 12).map((b) => b.toString(16)).join(" ") : m.map((b) => b.toString(16)).join(" ")));
   outlet(1, "sent");                                                 // a control was used: the name display closes an open field
 }
 
-const COMMANDS = { load, send, stop, gap, channel, cc, note, pc, dp, request, settings, store, stored, replied, frame };
+const COMMANDS = { load, send, stop, gap, channel, cc, note, pc, dp, request, settings, store, stored, replied, frame, pushed, arm };
 
 function anything() {
   const name = String(messagename).replace(/^\//, "");

@@ -7,6 +7,17 @@ All notable changes to SidStation Editor are listed here, newest first. The form
 
 ## [Unreleased]
 
+### Changed
+
+- **Store patch is greyed until Push patch has been pressed**, and greyed again by any change after
+  that, so what it saves is always what the editor shows. Store saves what the synth has, so right
+  after a set was loaded it would have saved the synth's sound, not the editor's. Patch Action's
+  Store patch is refused in the same state. After Push patch a notice by the button says the sound
+  can now be saved. Store and Pull go to the patch number the synth's display shows, also while it
+  flashes before ENTER.
+- Shorter help texts for Push patch, Pull patch and Store patch in Live's Info View: the note to
+  programs driving the editor stays in Patch Action and the device description.
+
 ## [0.3.2] - 2026-10-31
 
 ### Added

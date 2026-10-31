@@ -148,7 +148,16 @@ function paint() {
 // Own tooltip (v8ui has none): shown when the mouse rests over a disabled ring arrow. Drawn by the tooltip layer in front of
 // the overview (sid.tip.js, outlet 1), so the patch name display, which lies in front of this box, never hides it.
 let tip = null;   // { x, y, lines: [...] }
-function showTip() { if (tip) outlet(1, "tip", tip.x, tip.y, ...tip.lines); else outlet(1, "tip"); }
+// The Store notice: after Push patch the gateway says "storable 1" (build-station.js), and the tooltip layer shows for a few seconds,
+// down by the Store button, that the sound can now be saved on the synth. "storable 0" (any change) only greys the button.
+let notice = null, noticeTask = null;
+function storable(v) {
+  if (noticeTask) { noticeTask.cancel(); noticeTask = null; }
+  notice = v ? { x: -6, y: 166, lines: ["Store patch saves this sound", "to the synth's patch number"] } : null;
+  if (notice) { noticeTask = new Task(() => { notice = null; noticeTask = null; showTip(); }); noticeTask.schedule(5000); }
+  showTip();
+}
+function showTip() { const t = tip || notice; if (t) outlet(1, "tip", t.x, t.y, ...t.lines); else outlet(1, "tip"); }
 // What is under the mouse, including things that cannot be clicked? -> text or null
 function hoverText(x, y) {
   for (let i = 0; i < 3; i++) {
@@ -238,5 +247,5 @@ function bang() {
 function onresize() { mgraphics.redraw(); }
 function anything() { post("sid.map: unknown message " + messagename + "\n"); }
 
-paint = sidguard("map", paint); onclick = sidguard("map", onclick); set = sidguard("map", set); onidle = sidguard("map", onidle);
+paint = sidguard("map", paint); onclick = sidguard("map", onclick); set = sidguard("map", set); onidle = sidguard("map", onidle); storable = sidguard("map", storable);
 sidlog("map", "loaded");
