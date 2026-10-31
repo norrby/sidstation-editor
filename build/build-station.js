@@ -37,6 +37,7 @@ const DEVICE = require("../package.json").productName;
 // overview's help text, the description, the name display's title, the log); only "npm run release" (--release) builds the plain version.
 const RELEASE = process.argv.includes("--release");
 const VERSION = require("../package.json").version + (RELEASE ? "" : "-dev");
+const GUIDE = "device-guide.md";   // the device guide's file name, as the description names it (docs/device-guide.md, embedded by freeze.js)
 // The version as the Version parameter holds it, major * 10000 + minor * 100 + patch (as encode() in max/sid.version.js).
 const versionCode = (v) => { const m = /^(\d+)\.(\d+)\.(\d+)/.exec(v); return Number(m[1]) * 10000 + Number(m[2]) * 100 + Number(m[3]); };
 function buildDevice(title) {
@@ -211,7 +212,8 @@ const LAYOUTS = {};
     + "overwrites the patch number the synth shows for good, and is allowed only right after Push patch (greyed and refused otherwise). Patch Action (None, Pull patch, Push patch, Store patch) presses those buttons and goes back to None by itself. A waveform table is edited through Osc n Table Step, set first in a call of its own, then the step's Table Wave, Mod, "
     + "Pitch and Note or Offset; Table Length, Loop and Loop To apply to the whole table, which plays only while Table Speed is above 0. Osc n Table Data is the editor's own storage; "
     + "Osc n Table Clear empties the table and sets Table Speed to 0, so never choose it unless the user asks. Parameters with the values hidden/shown only show or hide panels and do not change the sound. The patch name is Name 1 to Name 10 "
-    + "as ASCII codes and names the device in Live.";
+    + "as ASCII codes and names the device in Live. A short guide to the synth and this editor (signal path, oscillators, tables, filter, LFOs, "
+    + "patches, what the synth cannot do) is embedded in the device as " + GUIDE + ".";
   LAYOUTS[DEVICE] = layout;
   A.writeAmxd(path.join(OUT_DIR, DEVICE + ".amxd"), json);
   console.log("wrote dist/" + DEVICE + ".amxd (" + width + " px)");
@@ -226,5 +228,6 @@ writeIfChanged(path.join(OUT_DIR, "sid.load.js"), ["lib/maxlog.js", "lib/params.
 writeIfChanged(path.join(OUT_DIR, "sid.version.js"), ["lib/maxlog.js", "max/sid.version.js"].map(read).join("\n\n"));         // the version in the set
 writeIfChanged(path.join(OUT_DIR, "sid.layout.js"), [read("lib/maxlog.js"), read("lib/layout.js"), "const LAYOUTS = " + JSON.stringify(LAYOUTS) + ";\n", read("max/sid.layout.js")].join("\n\n"));
 for (const f of ["sid.adsr.js", "sid.pulse.js", "sid.note.js", "sid.map.js", "sid.fold.js", "sid.section.js", "sid.filtcurve.js", "sid.legend.js", "sid.vslider.js", "sid.name.js", "sid.lfoview.js", "sid.table.js", "sid.voicebg.js", "sid.tablenote.js", "sid.lfotabs.js", "sid.loopbtn.js", "sid.litbtn.js", "sid.activebtn.js", "sid.dimbtn.js", "sid.tip.js"]) writeIfChanged(path.join(OUT_DIR, f), ["lib/maxlog.js", "lib/ui.js", "max/" + f].map(read).join("\n\n").replace("\n\n// sid.name.js", "\n\nconst DEVICE_NAME = " + JSON.stringify(DEVICE) + ";\nconst DEVICE_TITLE = " + JSON.stringify(DEVICE + " " + VERSION) + ";\n\n// sid.name.js"));   // + the shared palette (and the device name for sid.name.js)
+copyIfChanged(path.join(__dirname, "..", "docs", "device-guide.md"), path.join(OUT_DIR, GUIDE));   // next to the device; freeze.js embeds it
 for (const f of fs.readdirSync(path.join(__dirname, "..", "max", "icons"))) copyIfChanged(path.join(__dirname, "..", "max", "icons", f), path.join(OUT_DIR, f));
 console.log("wrote dist/sid.osc.js, sid.layout.js, widgets, icons");

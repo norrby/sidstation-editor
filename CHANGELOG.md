@@ -7,6 +7,12 @@ All notable changes to SidStation Editor are listed here, newest first. The form
 
 ## [Unreleased]
 
+### Added
+
+- **A device guide** (docs/device-guide.md): a short text on the synth and the editor, from the
+  signal path to what the synth cannot do, with the Live parameter names. It is embedded in the
+  device file, and the device description names it, so a program driving the editor can read it.
+
 ### Changed
 
 - **Store patch is greyed until Push patch has been pressed**, and greyed again by any change after

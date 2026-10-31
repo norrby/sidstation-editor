@@ -35,5 +35,8 @@ test("freeze: the device plus its scripts and icons, byte for byte, and nothing 
     assert.deepEqual(e[f].data, fs.readFileSync(path.join(ROOT, "dist", f)), f + " unchanged");
   }
   for (const f of ["sid.fake.js", "sid.probe.js"]) assert.ok(!e[f], f + " is not part of the device");
+  assert.equal(e["device-guide.md"].type, "TEXT", "the guide the description names is embedded");
+  assert.deepEqual(e["device-guide.md"].data, fs.readFileSync(path.join(ROOT, "docs", "device-guide.md")));
+  assert.match(JSON.parse(e[NAME + ".amxd"].data.toString().replace(/\0+$/, "")).patcher.description, /embedded in the device as device-guide\.md\.$/);
   assert.ok(!buf.includes(Buffer.from("/Users/")), "no local paths");
 });

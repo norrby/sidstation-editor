@@ -22,8 +22,9 @@ const raw = fs.readFileSync(src);
 if (raw.subarray(0, 4).toString() !== "ampf" || raw.subarray(24, 28).toString() !== "ptch") throw new Error(src + ": not an unfrozen .amxd");
 const json = raw.subarray(32, 32 + raw.readUInt32LE(28));
 
-// The files it uses: every .js/.svg named in the patcher that exists next to it, and the .svg files those scripts name.
-const named = (text) => [...new Set(text.match(/[\w.-]+\.(?:js|svg)\b/g) || [])].filter((f) => fs.existsSync(path.join(dir, f)));
+// The files it uses: every .js/.svg/.md named in the patcher that exists next to it, and the .svg files those scripts name. The .md is
+// the device guide, which the device's description names, so a program reading the description knows where to find it.
+const named = (text) => [...new Set(text.match(/[\w.-]+\.(?:js|svg|md)\b/g) || [])].filter((f) => fs.existsSync(path.join(dir, f)));
 const files = new Set(named(json.toString("utf8")));
 for (const f of [...files]) if (f.endsWith(".js")) for (const g of named(fs.readFileSync(path.join(dir, f), "utf8"))) if (g.endsWith(".svg")) files.add(g);
 
