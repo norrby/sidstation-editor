@@ -27,9 +27,9 @@ test("SidStation: every parameter has a help text, on screen or not (read by pro
   assert.match(byVar("o1_show").annotation, /Does not change the sound/);
   assert.match(byVar("c_action").annotation, /Store patch overwrites.*\[ask first\]$/);
   assert.match(p.description, /Live's API/);
-  assert.match(p.description, new RegExp("^" + NAME + " " + require("../package.json").version.replace(/\./g, "\\.") + "\\. "));   // the version first
+  assert.match(p.description, new RegExp("^" + NAME + " " + require("../package.json").version.replace(/\./g, "\\.") + "(-dev)?\\. "));   // the version first ("-dev" unless built for a release)
   assert.match(byVar("d_version").annotation, /302 is 0\.3\.2/);
-  assert.match(byVar("map").annotation, new RegExp("This is " + NAME + " " + require("../package.json").version.replace(/\./g, "\\.") + "\\.$"), "the version where a person can read it");
+  assert.match(byVar("map").annotation, new RegExp("This is " + NAME + " " + require("../package.json").version.replace(/\./g, "\\.") + "(-dev)?\\.$"), "the version where a person can read it");
 });
 
 test("help: sync and ring name the previous oscillator", () => {

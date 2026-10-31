@@ -297,7 +297,7 @@ test("SidStation: the Version parameter is stored only, off screen and off Push,
   assert.deepEqual([vo.parameter_initial_enable, vo.parameter_initial], [1, [0]], "a new device restores 0");
   assert.ok(!box.box.presentation, "not on screen");
   for (const b of Object.values(p.parameters.parameterbanks)) assert.ok(!b.parameters.includes("Version"), b.name + ": not on Push");
-  const [js] = from(box.box.id); assert.equal(text(js), "v8 sid.version.js " + version);
+  const [js] = from(box.box.id); assert.match(text(js), new RegExp("^v8 sid\\.version\\.js " + version.replace(/\./g, "\\.") + "(-dev)?$"), "the build's version, -dev unless built for a release");
   assert.deepEqual(from(js), [box.box.id], "the stamp goes back into the parameter");
 });
 

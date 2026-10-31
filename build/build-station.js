@@ -33,7 +33,10 @@ const OSCS = [1, 2, 3];
 // The device's name (package.json productName): its file name in Live's browser, its name in the track when no patch name is
 // set (sid.name.js, DEVICE_NAME), the layout's key, the release file.
 const DEVICE = require("../package.json").productName;
-const VERSION = require("../package.json").version;     // kept in every set by sid.version.js, and in the description
+// kept in every set by sid.version.js, and in the description. A development build says "-dev" wherever the version shows (the
+// overview's help text, the description, the name display's title, the log); only "npm run release" (--release) builds the plain version.
+const RELEASE = process.argv.includes("--release");
+const VERSION = require("../package.json").version + (RELEASE ? "" : "-dev");
 function buildDevice(title) {
   const json = A.midiEffectSkeleton(title, 100);
   const p = json.patcher;

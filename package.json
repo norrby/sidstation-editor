@@ -7,7 +7,7 @@
   "license": "GPL-3.0-or-later",
   "scripts": {
     "build": "node build/build-station.js",
-    "release": "node build/build-station.js && node build/freeze.js",
+    "release": "node build/build-station.js --release && node build/freeze.js",
     "test": "node --test test/*.test.js",
     "validate": "node tools/validate-bank.js"
   },

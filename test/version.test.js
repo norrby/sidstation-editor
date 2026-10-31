@@ -64,3 +64,9 @@ test("version: an older set is logged with its version and stamped; the same ver
   assert.equal(b.tasks.length, 0);
   assert.deepEqual(b.out, []);
 });
+
+test("version: a development build's version (0.3.2-dev) is stamped as its release number", () => {
+  const { v, out, run } = load("0.3.2-dev");
+  v.msg_float(0); run();
+  assert.deepEqual(out, [302]);
+});
