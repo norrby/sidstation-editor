@@ -60,11 +60,12 @@ function renameAll(boxes, panels) {
   panels.forEach(walk);
   return added.length;
 }
-// Where a live.dial draws its name: the top line of its box. Measured against a screenshot of the dials with their own names
-// (label, knob and value as fractions of the row pitch): the dial without its name goes 14 px down and ends 1 px lower, and a
-// live.comment at 8.5 pt is as wide as the dial's own name at 9 pt.
-const LABEL_H = 12, LABEL_PT = 8.5, DIAL_DOWN = 14, DIAL_LONGER = 1;
-const labelRect = (r) => [r[0], r[1], r[2], LABEL_H];
+// Where a live.dial draws its name: the top line of its box. Measured on one screenshot with the old device (dials with their own
+// names) and the new one side by side, against the section title above and the buttons below: a live.comment draws its text about
+// 2.5 pt lower than a dial draws its name, so the label goes up by that much; the dial without its name then sits 11.5 pt below
+// the label's place and 1.5 pt shorter, which puts knob and value where they were. 9 pt is the size of the dial's own name.
+const LABEL_H = 12, LABEL_UP = 2.5, LABEL_PT = 9, DIAL_DOWN = 11.5, DIAL_LONGER = -1.5;
+const labelRect = (r) => [r[0], r[1] - LABEL_UP, r[2], LABEL_H];
 const dialRect = (r) => [r[0], r[1] + DIAL_DOWN, r[2], r[3] - DIAL_DOWN + DIAL_LONGER];
 
 module.exports = { shortName, renameAll, LABEL_H };
