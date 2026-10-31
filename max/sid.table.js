@@ -344,12 +344,36 @@ function changed(quietWhileDragging) { mgraphics.redraw(); if (!(quietWhileDragg
 
 // --- Push ------------------------------------------------------------------
 
+// Live's undo. Every knob change is a step in Live's undo history, and so is every change of the stored table (Osc n Table Data), so
+// one edit from a knob is several steps. Undoing them turns the knobs back and restores the stored table (setvalueof). A knob turned
+// by an undo or redo must not edit the table as well: the table's own step puts it back, and applying the knob too wrote the table
+// again – a new step that emptied the redo list, and the table ended up wrong. While Live has something to redo, a knob change comes
+// from an undo or redo: a change of one's own empties the redo list, but only after the value has arrived here, so the knob changes
+// are looked at a moment later (PUSH_SETTLE_MS), all that came in meanwhile together and in order.
+const PUSH_SETTLE_MS = 50;
+let liveSet = null;
+function undoing() {
+  try { if (!liveSet) liveSet = new LiveAPI("live_set"); return Number(liveSet.get("can_redo")) === 1; } catch (e) { return false; }
+}
+const pending = [];
+const settle = typeof LiveAPI === "undefined" ? null : new Task(() => {    // null outside Max (tests): applied at once
+  const batch = pending.splice(0), u = undoing();
+  for (const [key, v] of batch) {
+    if (u) sidlog("table", "push " + key + " " + v + ": undo or redo, the table is left to Live's restore");
+    else applyPush(key, v);
+  }
+}, this);
+
 function push(key, v) {
   v = Math.round(Number(v));
   if (!Number.isFinite(v)) return;
   if (syncing) return;                                                       // our own value coming back from the knob
   knobVal[key] = v;
   if (!pushSeen[key]) { pushSeen[key] = true; sidlog("table", "push " + key + ": first value " + v + " kept, not applied (the restore on load)"); resync.schedule(300); return; }
+  if (!settle) { applyPush(key, v); return; }
+  pending.push([key, v]); settle.schedule(PUSH_SETTLE_MS);
+}
+function applyPush(key, v) {
   sidlog("table", "push", key, v);
   if (key !== "loop" && key !== "target") loopToShown = false;             // any other knob: Speed is back
   if (key === "step") { cursor = clamp(v, 0, Math.max(0, n - 1)); msg = describe(cursor); mgraphics.redraw(); knobs(); return; }   // not past the table: knobs() pushes the knob back
@@ -476,20 +500,29 @@ function loopmode(v) {
 // Stored by Live (the box is a hidden blob parameter): [1 (format), n, encoded table…]. setvalueof loads it like a dump; the router
 // takes the first table after loading as its baseline, so a restore is not echoed to the synth (a preset recall later is sent).
 function getvalueof() { return [1, n].concat(encode()); }
+// Live restores the stored table on load and on undo/redo. That is no change of ours: telling Live about it (notifyclients) or moving
+// the knobs (each write a step in the undo history) would add steps of its own and empty the redo list. The knobs catch up with the
+// next edit; the table still goes to the synth (the router sends only what differs, and nothing on load).
+let restoring = false, stored = "";                                       // stored: the value Live holds, as last told or restored
 function setvalueof() {
   const a = arrayfromargs(arguments).map(Number);
   if (a[0] !== 1 || a.length < 3) { sidlog("table", "stored value ignored (format", a[0], "length", a.length + ")"); return; }
   const len = a[1], b = a.slice(2);
-  bytes.apply(this, b);
-  if (len >= MAXCOL && n !== len) { n = len; mgraphics.redraw(); out(); }   // a full table (no command) is not told apart by bytes()
+  restoring = true;
+  try {
+    bytes.apply(this, b);
+    if (len >= MAXCOL && n !== len) { n = len; mgraphics.redraw(); out(); }   // a full table (no command) is not told apart by bytes()
+  } finally { restoring = false; }
+  stored = getvalueof().join(" ");
   sidlog("table", "restored from Live:", n, "steps");
 }
 function out() {
-  try { notifyclients(); } catch (e) {}                                  // Live: the stored value changed
+  const now = getvalueof().join(" ");
+  if (!restoring && now !== stored) { stored = now; try { notifyclients(); } catch (e) {} }   // Live: the stored value changed (one undo step)
   outlet(0, "steps", n, term, target);
   outlet(0, "loop", term === "loop" && n < MAXCOL ? 1 : 0);              // -> the button
   outlet(0, ["bytes"].concat(encode()));
-  knobs();
+  if (!restoring) knobs();
 }
 function bang() { out(); }
 function onresize() { mgraphics.redraw(); }

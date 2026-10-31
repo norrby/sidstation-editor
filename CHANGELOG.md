@@ -44,6 +44,12 @@ All notable changes to SidStation Editor are listed here, newest first. The form
 
 ### Fixed
 
+- **Undo and redo of the waveform tables.** Undoing an edit made through a table knob (Table Step,
+  Wave, Length …) turned the knob back, and the editor took that as a new edit and wrote the table
+  again, so the table ended up wrong and redo was lost. Now a knob turned by undo or redo leaves the
+  table alone, and the table's own undo step puts it back. Live's restore of a table (on load, undo
+  or redo) no longer adds undo steps of its own. A click in the table is one undo step; an edit
+  through the knobs is still several, but each undo leaves the table right.
 - **A newly added editor can be undone away again.** On load it set a Push knob of each
   oscillator's waveform table (Table Note) although the table was empty; every such write is a step
   in Live's undo history, and each Cmd+Z made the editor write it back, so the device never went

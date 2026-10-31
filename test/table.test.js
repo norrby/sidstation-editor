@@ -7,16 +7,16 @@ const path = require("path");
 const { sidlog, sidguard } = require("../lib/maxlog");
 
 function loadWidget() {
-  const out = [], logs = [], inks = [];
+  const out = [], logs = [], inks = [], notified = [];
   const mg = { size: [640, 150], init() {}, redraw() {}, text_measure: () => [10, 8] };
   for (const f of ["set_source_rgba", "rectangle", "fill", "set_line_width", "move_to", "line_to", "stroke", "close_path", "select_font_face", "set_font_size", "show_text", "arc", "ellipse"]) mg[f] = () => {};
   mg.set_source_rgba = (...a) => inks.push([].concat(...a));
-  const g = { UI, sidlog: (...a) => logs.push(a.join(" ")), sidguard, mgraphics: mg, post() {}, outlet: (o, ...a) => out.push([].concat(...a).join(" ")), arrayfromargs: (a) => Array.from(a),
+  const g = { UI, sidlog: (...a) => logs.push(a.join(" ")), sidguard, mgraphics: mg, post() {}, notifyclients: () => notified.push(1), outlet: (o, ...a) => out.push([].concat(...a).join(" ")), arrayfromargs: (a) => Array.from(a),
     messagename: "", Task: class { constructor(fn) { this.fn = fn; this.running = false; } repeat() { this.running = true; } cancel() { this.running = false; } schedule() {} } };
   const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.table.js"), "utf8")
     .replace(/^inlets = 1;\noutlets = 1;\n/m, "").replace("const born = Date.now();", "const born = 0;");
-  const fn = new Function(...Object.keys(g), src + "\nreturn { geom, paint, onclick, ondrag, bytes, bang, encode, clear, loopmode, note, tick, rate, speed: (v) => { messagename = 'speed'; anything(v); }, get play() { return play; }, get running() { return ticker.running; }, get n() { return n; }, get term() { return term; }, get steps() { return steps; }, push, get cursor() { return cursor; } };");
-  return { w: fn(...Object.values(g)), out, logs, inks };
+  const fn = new Function(...Object.keys(g), src + "\nreturn { geom, paint, onclick, ondrag, bytes, bang, encode, clear, loopmode, note, tick, rate, speed: (v) => { messagename = 'speed'; anything(v); }, get play() { return play; }, get running() { return ticker.running; }, get n() { return n; }, get term() { return term; }, get steps() { return steps; }, push, get cursor() { return cursor; }, setvalueof, getvalueof };");
+  return { w: fn(...Object.values(g)), out, logs, inks, notified };
 }
 const last = (out) => out.filter((s) => s.startsWith("bytes")).pop();
 
@@ -203,6 +203,20 @@ test("a new device writes no knob and no bank (each is an undo step in Live), an
   assert.deepEqual(out.filter((s) => /^(knob|bank)/.test(s)), [], "nothing written on load");
   w.push("note", 0);                                                         // Cmd+Z turned a knob: refused, and not answered with a write
   assert.deepEqual(out.filter((s) => /^(knob|bank)/.test(s)), []);
+});
+
+test("Live's restore (load, undo, redo) is not told back to Live and moves no knob; an edit tells Live once, an unchanged table not at all", () => {
+  const { w, out, notified } = loadWidget();
+  restore(w);
+  w.setvalueof(1, 2, 0x10, 0x3c, 0x20, 0xff, 0xff);                         // Live restores a stored table
+  assert.equal(w.n, 2);
+  assert.equal(notified.length, 0, "a restore is no change of ours: no new undo step");
+  assert.deepEqual(out.filter((s) => /^knob/.test(s)), [], "no knob written (each write is an undo step)");
+  assert.equal(last(out), "bytes 16 60 32 255 255", "the restored table still goes to the synth's router");
+  w.push("len", 3);
+  assert.equal(notified.length, 1, "an edit is one change of the stored table");
+  w.push("len", 3);
+  assert.equal(notified.length, 1, "the same table again: nothing to tell Live");
 });
 
 test("push: Length grows and shrinks the table, keeps Loop below 65 and clamps the cursor's edits to the table", () => {
