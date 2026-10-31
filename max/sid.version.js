@@ -16,6 +16,7 @@ function decode(n) { n = Math.round(n); return Math.floor(n / 10000) + "." + (Ma
 const CODE = encode(VERSION);
 let stamp = null;                                                        // the Task that writes the version back, or null
 let seen = false;                                                        // the first value (Live's restore) has been logged
+let stamped = false;                                                     // written once per load: if the echo differs, it is logged, never written again (no loop)
 
 function msg_float(v) {
   const n = Math.round(Number(v));
@@ -27,7 +28,8 @@ function msg_float(v) {
       : "new device, or a set saved before the version was kept; device is " + VERSION);
   }
   if (n === CODE) return;
-  if (stamp) stamp.cancel();
+  if (stamped) { sidlog("version", "the parameter holds " + n + " after " + CODE + " was written: not kept"); return; }
+  stamped = true;
   stamp = new Task(() => { stamp = null; outlet(0, CODE); });
   stamp.schedule(50);
 }

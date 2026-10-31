@@ -41,6 +41,17 @@ test("version: a new device (restore 0) is stamped after 50 ms, and the stamp co
   assert.equal(logs.filter((l) => /set saved|new device/.test(l)).length, 1, "the restore is logged once");
 });
 
+test("version: a stamp that comes back changed is logged once and never written again (no loop)", () => {
+  const { v, out, tasks, logs, run } = load("0.3.2");
+  v.msg_float(0); run();
+  assert.deepEqual(out, [302]);
+  v.msg_float(255);                                                    // the parameter clipped it
+  assert.equal(tasks.length, 0);
+  assert.match(logs.at(-1), /holds 255 after 302 was written: not kept/);
+  v.msg_float(255);
+  assert.deepEqual(out, [302], "written once");
+});
+
 test("version: an older set is logged with its version and stamped; the same version is left alone", () => {
   const a = load("0.3.2");
   a.v.msg_int(301);

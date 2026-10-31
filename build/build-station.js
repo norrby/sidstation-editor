@@ -74,7 +74,7 @@ function buildDevice(title) {
   // restores a set's values by them, so a renamed parameter would lose its value in every saved set.
   const vVer = id(), vVerJs = id();
   boxes.push(live(vVer, "live.numbox", [1300, 30, 70, 18], null, { parameter_longname: "Version", parameter_shortname: "Version",
-      parameter_type: 1, parameter_mmin: 0, parameter_mmax: 999999, parameter_unitstyle: 0, parameter_invisible: 1,
+      parameter_type: 0, parameter_mmin: 0, parameter_mmax: 999999, parameter_unitstyle: 0, parameter_invisible: 1,   // float: an int came back as 255 (clipped to 8 bits somewhere)
       parameter_modmode: 0, parameter_initial_enable: 1, parameter_initial: [0], parameter_visible_undoable: 0 }, {}, "d_version"),
     A.obj(vVerJs, "v8 sid.version.js " + VERSION, [1300, 60, 150, 20], 1, [""]));
   lines.push(A.line(vVer, 0, vVerJs, 0), A.line(vVerJs, 0, vVer, 0));
@@ -182,6 +182,7 @@ function buildDevice(title) {
   for (const { box: b } of boxes) {                                      // Live's Info View: a title and a plain-English text (lib/help.js), also
     const h = b.varname && H.help(b.varname);                             // on parameters with no control on screen, for a program reading the device
     if (h) { b.annotation_name = h[0]; b.annotation = h[1]; }
+    if (b.varname === "map") b.annotation += " This is " + DEVICE + " " + VERSION + ".";   // Live shows no description for the device itself in the Info View, so the version is here
   }
   boxes.push(A.verticalLimit());
   p.boxes = boxes; p.lines = lines;
@@ -215,6 +216,6 @@ writeIfChanged(path.join(OUT_DIR, "sid.capture.js"), ["lib/maxlog.js", "lib/syse
 writeIfChanged(path.join(OUT_DIR, "sid.load.js"), ["lib/maxlog.js", "lib/params.js", "max/sid.load.js"].map(read).join("\n\n"));
 writeIfChanged(path.join(OUT_DIR, "sid.version.js"), ["lib/maxlog.js", "max/sid.version.js"].map(read).join("\n\n"));         // the version in the set
 writeIfChanged(path.join(OUT_DIR, "sid.layout.js"), [read("lib/maxlog.js"), read("lib/layout.js"), "const LAYOUTS = " + JSON.stringify(LAYOUTS) + ";\n", read("max/sid.layout.js")].join("\n\n"));
-for (const f of ["sid.adsr.js", "sid.pulse.js", "sid.note.js", "sid.map.js", "sid.fold.js", "sid.section.js", "sid.filtcurve.js", "sid.legend.js", "sid.vslider.js", "sid.name.js", "sid.lfoview.js", "sid.table.js", "sid.voicebg.js", "sid.tablenote.js", "sid.lfotabs.js", "sid.loopbtn.js", "sid.litbtn.js", "sid.activebtn.js", "sid.dimbtn.js", "sid.tip.js"]) writeIfChanged(path.join(OUT_DIR, f), ["lib/maxlog.js", "lib/ui.js", "max/" + f].map(read).join("\n\n").replace("\n\n// sid.name.js", "\n\nconst DEVICE_NAME = " + JSON.stringify(DEVICE) + ";\n\n// sid.name.js"));   // + the shared palette (and the device name for sid.name.js)
+for (const f of ["sid.adsr.js", "sid.pulse.js", "sid.note.js", "sid.map.js", "sid.fold.js", "sid.section.js", "sid.filtcurve.js", "sid.legend.js", "sid.vslider.js", "sid.name.js", "sid.lfoview.js", "sid.table.js", "sid.voicebg.js", "sid.tablenote.js", "sid.lfotabs.js", "sid.loopbtn.js", "sid.litbtn.js", "sid.activebtn.js", "sid.dimbtn.js", "sid.tip.js"]) writeIfChanged(path.join(OUT_DIR, f), ["lib/maxlog.js", "lib/ui.js", "max/" + f].map(read).join("\n\n").replace("\n\n// sid.name.js", "\n\nconst DEVICE_NAME = " + JSON.stringify(DEVICE) + ";\nconst DEVICE_TITLE = " + JSON.stringify(DEVICE + " " + VERSION) + ";\n\n// sid.name.js"));   // + the shared palette (and the device name for sid.name.js)
 for (const f of fs.readdirSync(path.join(__dirname, "..", "max", "icons"))) copyIfChanged(path.join(__dirname, "..", "max", "icons", f), path.join(OUT_DIR, f));
 console.log("wrote dist/sid.osc.js, sid.layout.js, widgets, icons");
