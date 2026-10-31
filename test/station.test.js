@@ -264,6 +264,23 @@ test("SidStation: Patch Action is an automated parameter off screen and off Push
   assert.deepEqual([0, 1, 2].map((o) => text(from(sel, o)[0])), ["fetch", "sendall", "store"], "the buttons' own messages");
 });
 
+test("SidStation: the Version parameter is stored only, off screen and off Push, and wired both ways to sid.version.js with the build's version", () => {
+  const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", NAME + ".amxd")).json.patcher;
+  const version = require("../package.json").version;
+  const text = (id) => (p.boxes.find((b) => b.box.id === id) || { box: {} }).box.text;
+  const from = (id) => p.lines.filter((l) => l.patchline.source[0] === id).map((l) => l.patchline.destination[0]);
+  const box = p.boxes.find((b) => b.box.varname === "d_version"), vo = box.box.saved_attribute_attributes.valueof;
+  assert.equal(box.box.maxclass, "live.numbox");
+  assert.equal(vo.parameter_longname, "Version");
+  assert.equal(vo.parameter_invisible, 1, "stored in the set, not automated");
+  assert.equal(vo.parameter_mmax, 999999);
+  assert.deepEqual([vo.parameter_initial_enable, vo.parameter_initial], [1, [0]], "a new device restores 0");
+  assert.ok(!box.box.presentation, "not on screen");
+  for (const b of Object.values(p.parameters.parameterbanks)) assert.ok(!b.parameters.includes("Version"), b.name + ": not on Push");
+  const [js] = from(box.box.id); assert.equal(text(js), "v8 sid.version.js " + version);
+  assert.deepEqual(from(js), [box.box.id], "the stamp goes back into the parameter");
+});
+
 test("SidStation: the Push table knobs are visible on Push only (not automated, no initial output, no presentation) and wired to the table", () => {
   const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", NAME + ".amxd")).json.patcher;
   const { PUSH_VISIBLE } = require("../build/station/common");

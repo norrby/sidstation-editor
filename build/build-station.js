@@ -33,6 +33,7 @@ const OSCS = [1, 2, 3];
 // The device's name (package.json productName): its file name in Live's browser, its name in the track when no patch name is
 // set (sid.name.js, DEVICE_NAME), the layout's key, the release file.
 const DEVICE = require("../package.json").productName;
+const VERSION = require("../package.json").version;     // kept in every set by sid.version.js, and in the description
 function buildDevice(title) {
   const json = A.midiEffectSkeleton(title, 100);
   const p = json.patcher;
@@ -67,6 +68,16 @@ function buildDevice(title) {
   );
   lines.push(A.line(vLayout, 0, vThis, 0), A.line(vLayout, 1, vWDefer, 0), A.line(vWDefer, 0, vThisDev, 0),
     A.line(vThisDev, 0, vDelay, 0), A.line(vDelay, 0, vArm, 0), A.line(vDelay, 0, vKick, 0), A.line(vKick, 0, vLayout, 0));
+  // The version in the set: a hidden parameter (stored only, no automation, in no bank) holds the version that last had the set,
+  // so the log can say what a set was saved with. On load Live restores it (0 for a new device or an older set) -> sid.version.js
+  // logs that and writes the device's own version back after 50 ms. Long parameter names never change after a release: Live
+  // restores a set's values by them, so a renamed parameter would lose its value in every saved set.
+  const vVer = id(), vVerJs = id();
+  boxes.push(live(vVer, "live.numbox", [1300, 30, 70, 18], null, { parameter_longname: "Version", parameter_shortname: "Version",
+      parameter_type: 1, parameter_mmin: 0, parameter_mmax: 999999, parameter_unitstyle: 0, parameter_invisible: 1,
+      parameter_modmode: 0, parameter_initial_enable: 1, parameter_initial: [0], parameter_visible_undoable: 0 }, {}, "d_version"),
+    A.obj(vVerJs, "v8 sid.version.js " + VERSION, [1300, 60, 150, 20], 1, [""]));
+  lines.push(A.line(vVer, 0, vVerJs, 0), A.line(vVerJs, 0, vVer, 0));
 
   // panels in a row; x0 = position in the full layout
   const panels = [];
@@ -183,7 +194,7 @@ const LAYOUTS = {};
 {
   const { json, layout, width } = buildDevice(DEVICE);
   // Live's Info View for the device itself (empty, Live showed a generic "MIDI Effect" text)
-  json.patcher.description = "Editor for the Elektron SidStation: every patch parameter as a Live parameter, with Pull, Push and Store patch. Not affiliated with Elektron.\n\n"
+  json.patcher.description = DEVICE + " " + VERSION + ". Editor for the Elektron SidStation: every patch parameter as a Live parameter, with Pull, Push and Store patch. Not affiliated with Elektron.\n\n"
     + "For a program driving the device through Live's API: every change to a parameter goes to the synth right away. A program must never choose Pull patch or Push patch "
     + "unless the user asks for it, and must never choose Store patch unless the user explicitly asks to store. Pull patch replaces every setting in the editor with the "
     + "synth's current slot; Push patch sends the whole editor state together, for example after a saved set has been loaded (loading sends nothing); Store patch "
@@ -202,6 +213,7 @@ writeIfChanged(path.join(OUT_DIR, "sid.lfo.js"), ["lib/maxlog.js", "lib/sysex.js
 writeIfChanged(path.join(OUT_DIR, "sid.send.js"), ["lib/maxlog.js", "lib/sysex.js", "lib/params.js", "lib/midi.js", "max/sid.send.js"].map(read).join("\n\n"));     // the gateway
 writeIfChanged(path.join(OUT_DIR, "sid.capture.js"), ["lib/maxlog.js", "lib/sysex.js", "lib/midi.js", "max/sid.capture.js"].map(read).join("\n\n"));               // the capture
 writeIfChanged(path.join(OUT_DIR, "sid.load.js"), ["lib/maxlog.js", "lib/params.js", "max/sid.load.js"].map(read).join("\n\n"));
+writeIfChanged(path.join(OUT_DIR, "sid.version.js"), ["lib/maxlog.js", "max/sid.version.js"].map(read).join("\n\n"));         // the version in the set
 writeIfChanged(path.join(OUT_DIR, "sid.layout.js"), [read("lib/maxlog.js"), read("lib/layout.js"), "const LAYOUTS = " + JSON.stringify(LAYOUTS) + ";\n", read("max/sid.layout.js")].join("\n\n"));
 for (const f of ["sid.adsr.js", "sid.pulse.js", "sid.note.js", "sid.map.js", "sid.fold.js", "sid.section.js", "sid.filtcurve.js", "sid.legend.js", "sid.vslider.js", "sid.name.js", "sid.lfoview.js", "sid.table.js", "sid.voicebg.js", "sid.tablenote.js", "sid.lfotabs.js", "sid.loopbtn.js", "sid.litbtn.js", "sid.activebtn.js", "sid.dimbtn.js", "sid.tip.js"]) writeIfChanged(path.join(OUT_DIR, f), ["lib/maxlog.js", "lib/ui.js", "max/" + f].map(read).join("\n\n").replace("\n\n// sid.name.js", "\n\nconst DEVICE_NAME = " + JSON.stringify(DEVICE) + ";\n\n// sid.name.js"));   // + the shared palette (and the device name for sid.name.js)
 for (const f of fs.readdirSync(path.join(__dirname, "..", "max", "icons"))) copyIfChanged(path.join(__dirname, "..", "max", "icons", f), path.join(OUT_DIR, f));
