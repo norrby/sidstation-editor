@@ -7,6 +7,12 @@ All notable changes to SidStation Editor are listed here, newest first. The form
 
 ## [Unreleased]
 
+### Added
+
+- **Ready**, a parameter that turns from loading to ready about 2 seconds after the device loads,
+  once Live has handed it the set's values. A program driving the editor through Live's API waits
+  for it; its help text ends with [ready], the mark Live MCP looks for.
+
 ### Changed
 
 - **Store patch is greyed until Push patch has been pressed**, and greyed again by any change after

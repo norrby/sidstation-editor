@@ -81,6 +81,17 @@ function buildDevice(title) {
       parameter_modmode: 0, parameter_initial_enable: 1, parameter_initial: [0], parameter_visible_undoable: 0 }, {}, "d_version"),
     A.obj(vVerJs, "v8 sid.version.js " + VERSION, [1300, 60, 150, 20], 1, [""]));
   lines.push(A.line(vVer, 0, vVerJs, 0), A.line(vVerJs, 0, vVer, 0));
+  // Ready: the [ready] convention of Live MCP (its help text ends with "[ready]"). 0 from load (loadbang, so a saved set's 1 does
+  // not count), 1 once the editor can be driven: Live delivers its restored values into the patch for up to ~1.5 s after the arm
+  // (seen in the log: "first value kept" lines after "armed"), and a value written before Live's own restore of that parameter
+  // would be taken as the restore and Live's value applied after it. So 2 s after the arm. Off screen, in no bank, no undo; it
+  // must be visible to Live's API (invisible 0) for a program to read it. It drives nothing: writing it changes nothing.
+  const vReady = id(), vReady0 = id(), vReady1 = id(), vReadyDelay = id();
+  boxes.push(live(vReady, "live.toggle", [1300, 100, 15, 15], null, { parameter_longname: "Ready", parameter_shortname: "Ready",
+      parameter_type: 2, parameter_enum: ["loading", "ready"], parameter_mmax: 1, parameter_invisible: 0, parameter_modmode: 0,
+      parameter_initial_enable: 1, parameter_initial: [0], parameter_visible_undoable: 0 }, {}, "d_ready"),
+    A.msg(vReady0, "0", [1330, 100, 20, 20]), A.msg(vReady1, "1", [1360, 100, 20, 20]), A.obj(vReadyDelay, "delay 2000", [1360, 75, 70, 20], 1, ["bang"]));
+  lines.push(A.line(vLoad, 0, vReady0, 0), A.line(vReady0, 0, vReady, 0), A.line(vDelay, 0, vReadyDelay, 0), A.line(vReadyDelay, 0, vReady1, 0), A.line(vReady1, 0, vReady, 0));
 
   // panels in a row; x0 = position in the full layout
   const panels = [];
