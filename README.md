@@ -2,7 +2,7 @@
 
 A Max for Live editor for the **Elektron SidStation**, the MOS 6581 (SID) synthesizer from 1999.
 Every sound parameter of a patch is on screen and automatable in Ableton Live: three oscillators
-with envelopes, pulse width and wave tables, the filter with its envelope, four LFOs, and the
+with envelopes, pulse width and waveform tables, the filter with its envelope, four LFOs, and the
 patch-wide settings.
 
 ![SidStation Editor in Ableton Live](docs/images/device.png)
@@ -26,10 +26,9 @@ Not affiliated with or endorsed by Elektron. Use at your own risk.
   without being heard.
 - **Push patch** sends the whole editor state to the synth's edit buffer. Right after it **Store
   patch** is available: it saves that sound to the patch number the synth's display shows (also
-  while the number flashes, before ENTER), overwriting it for good. Any change in the editor greys
-  Store patch again until the next Push patch, so what is saved is always what the editor shows.
-  Store saves what the synth has, so without Push first it would save the synth's sound, not the
-  editor's; the button is greyed to stop that.
+  while the number flashes, before ENTER), overwriting it for good. Store saves what the synth has,
+  so any change after Push greys it until the next Push patch: what is saved is always what the
+  editor shows.
 - **CC 119** (value above 0) on the track, from a clip or a controller button, pushes the patch too,
   at most once every 5 seconds. Put it at the start of a song so the synth plays what the editor
   shows. The editor keeps CC 119 to itself; it never reaches the synth.
@@ -45,7 +44,7 @@ Not affiliated with or endorsed by Elektron. Use at your own risk.
 - Every parameter has a help text in Live's Info View, also those with no control on screen, and
   the device description tells a program driving the editor through Live's API how to behave:
   edits reach the synth at once, and Pull, Push and Store patch are never chosen unless asked.
-- **Push 2:** every parameter in banks, and the waveform tables edited step by step (see Push below).
+- **Push 2 and 3:** every parameter in banks, and the waveform tables edited step by step (see Push below).
 - **"(using waveform table)"** after an oscillator's title shows that the table, not the Wave switch, sets
   its waveform. The Info View explains, and holding the mouse over the note points out the table.
 

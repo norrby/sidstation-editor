@@ -1,7 +1,7 @@
 // sid.load.js – v8: receives a decoded patch dump (SysEx 02) and sets the panels from it.
 // Bundled with lib/maxlog.js + lib/params.js (dist/sid.load.js). The path: the built-in capture [v8 sid.capture.js] -> deferlow -> here ->
 // [deferlow] -> this script -> [thispatcher]. The capture has no midiout and the editor's midiin drops SysEx;
-// the only thing that travels between the devices is the already decoded byte list.
+// the only thing that travels from the capture to the panels is the already decoded byte list.
 //
 // Every parameter is set with "script send <varname> <value>" to thispatcher, i.e. the live.* object gets
 // the value as if it had been turned: graphs, slider and overview follow without new patch cords.

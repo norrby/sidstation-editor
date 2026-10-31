@@ -30,6 +30,8 @@
 //   replied dump|settings                             a 02/03 dump or a 46 reply came in (from the capture)
 //   pushed          Push patch is done (sent after every router queued its frames): the synth has the editor's sound, Store may go
 //   arm             on load: says the Store state ("storable 0") so the button starts grey
+// Store goes grey again after any change: a router frame, a request, a stopped or failed queue, and from the track a program
+// change or a CC that sets a patch parameter (changesSound).
 // "storable 0|1" on outlet 1: Store patch is allowed only right after Push patch (the button is greyed otherwise, see below).
 // Every request that expects an answer is timed (Live can lose its input port, and Pull then just does nothing): 05 -> a dump, 06 -> 46, 07 -> 47. No answer within 3 s: a log line and
 // "noreply <dump|settings|store>" on outlet 1, and "sent" after every router frame (the name display shows NO REPLY until "answered" – any reply – or a click).
@@ -71,7 +73,13 @@ function pace(m) {
   return Math.round(m.length * 0.32) + gapMs;                // patch frame: wire time + storing
 }
 
+// An exception here would leave `task` set and never rescheduled, and every later message would wait for good: catch it,
+// drop the queue and say so (the store lock, if any, still ends by its reply or timeout).
 function drain() {
+  try { drainOne(); }
+  catch (e) { queue = []; task = null; touched(); status("STOP: error while sending (" + e.message + "), queue dropped"); }
+}
+function drainOne() {
   if (!task) return;
   if (storing) { task.schedule(10); return; }                // store lock: nothing to the synth until the reply
   if (!queue.length) {
@@ -82,7 +90,7 @@ function drain() {
   const m = queue.shift();
   if (m[0] === 0xf0) {                                       // last check right before sending
     const v = validate(m);
-    if (!v.ok) { queue = []; task = null; status("STOP: frame failed validation while sending (" + v.reason + ")"); return; }
+    if (!v.ok) { queue = []; task = null; touched(); status("STOP: frame failed validation while sending (" + v.reason + ")"); return; }
   }
   for (const b of m) outlet(0, b);
   if (m[0] === 0xf0 && m[6] === ID_STORE) lockStore();
@@ -202,6 +210,7 @@ function send() {
 function stop(report) {
   const dropped = queue.length;
   queue = [];
+  if (dropped) touched();                         // a Push cut short: the synth may not have the editor's sound
   if (task) { task.cancel(); task = null; }       // (a store lock stays: the synth may still be compacting)
   if (report !== false) status("stopped, " + dropped + " queued messages dropped");
   totalFrames = 0;
@@ -247,12 +256,17 @@ const midiIn = midiParser({                                          // lib/midi
     count(m);
     // A program change from the track's input selects a slot on the synth (its name then blinks until ENTER): logged, so it can be told apart from the editor
     if ((m[0] & 0xf0) === 0xc0) sidlog("send", "track input: program change", m[1], "on channel", (m[0] & 0x0f) + 1);
+    if (changesSound(m)) touched();                 // Store needs a new Push: the synth no longer has the editor's sound
     play(m);
   },
   sysex: () => sidlog("send", "REFUSED SysEx on the note path"),
   broken: () => sidlog("send", "REFUSED SysEx on the note path"),
 });
 function msg_int(b) { midiIn(b); }                                   // a declared function: Max looks msg_int up on the global object
+// From the track (a clip, a controller): a program change, or a CC that sets a patch parameter, changes the synth's edit buffer.
+// Playing controls do not: mod wheel (1), the LFO control sources (20-23) and sustain (64), nor notes, bend or pressure.
+const PLAYING_CC = new Set([1, 20, 21, 22, 23, 64]);
+function changesSound(m) { const t = m[0] & 0xf0; return t === 0xc0 || (t === 0xb0 && !PLAYING_CC.has(m[1])); }
 
 // From a router: "frame <bytes…>", one complete message at a time.
 function frame() {

@@ -1,10 +1,11 @@
 // sid.capture.js – capture SidStation SysEx in Max for Live (v8, Max 9).
-// Own decoding; built into dist/ by build/build-capture.js, bundled with lib/maxlog.js (sidlog -> logs/max.log,
+// Own decoding; bundled with lib/maxlog.js by build/build-station.js (sidlog -> logs/max.log,
 // so that the capture is visible outside the Max console).
 //
 // Usage: [midiin] -> [v8 sid.capture.js]. Every complete F0..F7 frame
 // is saved as dumps/<date>_<patchname>.syx and decoded in the Max console.
-// Outlet 0: "patch <bytes...>" (decoded raw bytes), outlet 1: "saved <path>".
+// Outlet 0: "patch <bytes...>" (decoded raw bytes), "stored …" (a 47 store reply), "replied dump|settings", "settings …" (a 46
+// reply, to the loader only: the patcher routes only stored/replied to the gateway). Outlet 1: "saved <path>".
 //
 // Messages: "dir <path>" changes directory, "clear" resets, "dump"
 // prints the latest frame again.

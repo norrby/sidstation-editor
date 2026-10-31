@@ -128,3 +128,17 @@ test("the frame that clears every patch (id 01) is refused, however it arrives",
   w.frame(...CLEAR);
   assert.deepEqual(out, []); assert.match(status.pop(), /^REFUSED bus: 01 clears every patch/);
 });
+
+test("Store goes grey on a patch CC or program change from the track, or a stopped queue; playing controls leave it", () => {
+  const { w, ev } = loadGateway();
+  const storable = () => ev.filter((e) => e[0] === "storable").map((e) => e[1]);
+  w.pushed();
+  for (const b of [0xb0, 1, 90, 0xb0, 64, 127, 0xb0, 20, 5, 0xe0, 0, 64, 0xd0, 30]) w.msg_int(b);   // wheel, sustain, LFO ctrl, bend, pressure
+  assert.deepEqual(storable(), [1], "playing controls change nothing");
+  w.msg_int(0xb0); w.msg_int(27); w.msg_int(40);                       // a patch CC (filter cutoff)
+  assert.deepEqual(storable(), [1, 0]);
+  w.pushed(); w.msg_int(0xc0); w.msg_int(5);                           // a program change
+  assert.deepEqual(storable(), [1, 0, 1, 0]);
+  w.pushed(); w.frame(...DP_TRI); w.frame(...DP_TRI); w.pushed(); w.stop();   // Push cut short
+  assert.deepEqual(storable().slice(-1), [0], "stop with frames still queued");
+});

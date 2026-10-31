@@ -159,7 +159,9 @@ sequenceDiagram
 
 ## 6. Pull and Store
 
-**Pull** fetches the patch the synth has stored; **Store** saves the synth's current sound in its current slot. Both
+**Pull** fetches the patch the synth has stored; **Store** saves the synth's current sound under the patch number its
+display shows (also while it flashes, before ENTER). Store saves what the synth has, not what the editor shows, so the
+gateway allows it only right after Push patch and greys the button again on any change. Both
 need our firmware patch, OS 1.12 R01 ([sidstation-firmware](https://github.com/norrby/sidstation-firmware)). With
 the stock OS the synth does not answer, and after 3 seconds the name display shows **NO REPLY**.
 

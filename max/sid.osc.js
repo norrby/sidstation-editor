@@ -20,7 +20,8 @@
 //                   (the values come from the synth and must not be echoed back to it).
 //           "channel n" MIDI channel 1..16 for CC (default 1).
 // Outlet 0: the track's notes to [midiout] (on to External Instrument). Outlet 1: "status <text>", "ringok 0|1",
-//           "note 1|0" for every note on/off that passes (drives the table playheads). Outlet 2: "frame <bytes…>" to the gateway.
+//           "note 1|0" for every note on/off that passes (drives the table playheads), "setactive 0|1" (the waveform turned the
+//           oscillator on/off), "pushcc" (CC 119: Push patch). Outlet 2: "frame <bytes…>" to the gateway.
 
 inlets = 1;
 outlets = 3;

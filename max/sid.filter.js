@@ -6,7 +6,7 @@
 // In:  <param> <v>      cutoff res envdepth lfodepth fattack fdecay fsustain frelease wheel flfo ftype wrap invert poly legato hcut
 //      route <n> <0|1>  osc n through the filter (1) or straight to the output (0)
 //      namechar <i> <code>  the patch name's character i (1..10), ASCII -> DP 00 0(i-1) 7f 00 (from sid.name.js via the Name parameters)
-//      slot <n>         the Patch Slot knob (Push): program change n (0..99) selects that patch on the synth; the first value is
+//      slot <n>         the Patch Number knob (Push): program change n (0..99) selects that patch on the synth; the first value is
 //                       Live's restore and is not sent, and Push patch leaves the slot alone
 //      arm              start sending (on load the values from live.* come first)
 //      sendall          send everything now
