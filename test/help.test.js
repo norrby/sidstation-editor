@@ -29,6 +29,7 @@ test("SidStation: every parameter has a help text, on screen or not (read by pro
   assert.match(p.description, /Live's API/);
   assert.match(p.description, new RegExp("^" + NAME + " " + require("../package.json").version.replace(/\./g, "\\.") + "\\. "));   // the version first
   assert.match(byVar("d_version").annotation, /302 is 0\.3\.2/);
+  assert.match(byVar("map").annotation, new RegExp("This is " + NAME + " " + require("../package.json").version.replace(/\./g, "\\.") + "\\.$"), "the version where a person can read it");
 });
 
 test("help: sync and ring name the previous oscillator", () => {
