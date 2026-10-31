@@ -229,7 +229,7 @@ writeIfChanged(path.join(OUT_DIR, "sid.osc.js"), ["lib/maxlog.js", "lib/sysex.js
 writeIfChanged(path.join(OUT_DIR, "sid.filter.js"), ["lib/maxlog.js", "lib/sysex.js", "lib/params.js", "max/sid.filter.js"].map(read).join("\n\n"));
 writeIfChanged(path.join(OUT_DIR, "sid.lfo.js"), ["lib/maxlog.js", "lib/sysex.js", "lib/params.js", "max/sid.lfo.js"].map(read).join("\n\n"));
 writeIfChanged(path.join(OUT_DIR, "sid.send.js"), ["lib/maxlog.js", "lib/sysex.js", "lib/params.js", "lib/midi.js", "max/sid.send.js"].map(read).join("\n\n"));     // the gateway
-writeIfChanged(path.join(OUT_DIR, "sid.capture.js"), ["lib/maxlog.js", "lib/sysex.js", "lib/midi.js", "max/sid.capture.js"].map(read).join("\n\n"));               // the capture
+writeIfChanged(path.join(OUT_DIR, "sid.capture.js"), ["const SID_DEV = " + !RELEASE + ";   // dumps kept as files only in a development build"].concat(["lib/maxlog.js", "lib/sysex.js", "lib/midi.js", "max/sid.capture.js"].map(read)).join("\n\n"));   // the capture
 writeIfChanged(path.join(OUT_DIR, "sid.load.js"), ["lib/maxlog.js", "lib/params.js", "max/sid.load.js"].map(read).join("\n\n"));
 writeIfChanged(path.join(OUT_DIR, "sid.version.js"), ["lib/maxlog.js", "max/sid.version.js"].map(read).join("\n\n"));         // the version in the set
 writeIfChanged(path.join(OUT_DIR, "sid.layout.js"), [read("lib/maxlog.js"), read("lib/layout.js"), "const LAYOUTS = " + JSON.stringify(LAYOUTS) + ";\n", read("max/sid.layout.js")].join("\n\n"));

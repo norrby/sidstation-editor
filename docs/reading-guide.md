@@ -60,8 +60,8 @@ Then watch the **Max Console**: every script logs there, and an exception in a m
 instead of being lost (`sidguard` in `lib/maxlog.js`). Open it from the device: click its edit button to open it in
 Max, then *Window → Max Console*.
 
-The same lines also go to a file if its folder exists in your home folder: `Library/Logs/SidStation/max.log` on
-macOS, `Documents/SidStation/logs/max.log` on Windows. With the file you can follow the log (`tail -f` on macOS)
+The same lines also go to a file if its folder exists in your home folder: `Library/Logs/SidStation-Editor/max.log` on
+macOS, `Documents/SidStation-Editor/logs/max.log` on Windows. With the file you can follow the log (`tail -f` on macOS)
 without opening Max. The places to try come from `sidUserPaths` in `lib/maxlog.js`.
 
 Small first changes, each with the tests as a safety net:

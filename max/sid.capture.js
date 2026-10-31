@@ -2,18 +2,18 @@
 // Bundled with lib/maxlog.js, lib/sysex.js (decodeDump, decodeReply) and lib/midi.js by build/build-station.js (sidlog -> logs/max.log,
 // so that the capture is visible outside the Max console).
 //
-// Usage: [midiin] -> [v8 sid.capture.js]. Every complete F0..F7 frame
-// is saved as dumps/<date>_<patchname>.syx and decoded in the Max console.
+// Usage: [midiin] -> [v8 sid.capture.js]. Every complete SidStation frame is decoded in the Max console; in a development
+// build a patch dump is also saved as dumps/<date>_<patchname>.syx (see dumpDirs).
 // Outlet 0: "patch <bytes...>" (decoded raw bytes), "stored …" (a 47 store reply), "replied dump|settings", "settings …" (a 46
 // reply, to the loader only: the patcher routes only stored/replied to the gateway). Outlet 1: "saved <path>".
 
 inlets = 1;
 outlets = 2;
 
-// Dumps are kept only when this folder exists (Max cannot create folders); otherwise they are just loaded into the editor.
-// Documents/SidStation/dumps in the home folder; the places to try come from sidUserPaths (lib/maxlog.js), the first
-// that works is kept.
-let dumpDirs = sidUserPaths("Documents/SidStation/dumps");
+// Dumps are kept as files only in a development build (SID_DEV, set by build/build-station.js), and only when this folder
+// exists (Max cannot create folders): Documents/SidStation-Editor/dumps in the home folder. The places to try come from
+// sidUserPaths (lib/maxlog.js); the first that works is kept. A release only loads a dump into the editor.
+let dumpDirs = SID_DEV ? sidUserPaths("Documents/SidStation-Editor/dumps") : [];
 let seq = 0;
 
 // Every complete F0..F7 frame (lib/midi.js); realtime in the middle is skipped, a frame cut off by a status byte is dropped.
@@ -39,20 +39,7 @@ function finish(frame) {
   }
   if (frame[6] === ID_SETTINGS_REPLY || frame[6] === ID_STORE_REPLY) { reply(frame); return; }
   const info = decodeDump(frame);
-  const d = new Date(), two = (n) => (n < 10 ? "0" : "") + n;                     // local time (toISOString gives UTC)
-  const stamp = d.getFullYear() + "-" + two(d.getMonth() + 1) + "-" + two(d.getDate()) + "-" + two(d.getHours()) + "-" + two(d.getMinutes());
-  const tag = info.name ? info.name.trim().replace(/[^A-Za-z0-9_-]/g, "_") : ("id" + hex(frame[6]));
-  seq++;
-  const name = "/" + stamp + "_" + String(seq).padStart(3, "0") + "_" + tag + ".syx";
-  const dir = dumpDirs.find((p) => save(p + name, frame));
-  if (dir) {
-    dumpDirs = [dir];
-    sidlog("capture", "saved " + frame.length + " bytes to " + dir + name);
-    outlet(1, "saved", dir + name);
-  } else {
-    sidlog("capture", "not saved: " + dumpDirs.join(" or ") + " does not exist (create it to keep dumps) – hex follows in the console");
-    post(frame.map(hex).join(" ") + "\n");
-  }
+  if (dumpDirs.length) keep(frame, info);
   report(frame, info);
   if (frame[6] === ID_DUMP || frame[6] === ID_SKIP) outlet(0, "replied", "dump");   // ends the gateway's wait after a 05 request
   if (info.patch) { sidlog("capture", "patch '" + info.name + "' -> the editor, " + info.patch.length + " raw bytes"); outlet(0, "patch", ...info.patch); }
@@ -70,6 +57,23 @@ function reply(frame) {
   } else {
     sidlog("capture", "store reply: " + r.statusText + ", slot " + r.slot + ", size " + r.size + ", checksum " + r.sum + ", free " + r.free);
     outlet(0, "stored", r.status, r.slot, r.size, r.sum, r.free);
+  }
+}
+
+function keep(frame, info) {
+  const d = new Date(), two = (n) => (n < 10 ? "0" : "") + n;                     // local time (toISOString gives UTC)
+  const stamp = d.getFullYear() + "-" + two(d.getMonth() + 1) + "-" + two(d.getDate()) + "-" + two(d.getHours()) + "-" + two(d.getMinutes());
+  const tag = info.name ? info.name.trim().replace(/[^A-Za-z0-9_-]/g, "_") : ("id" + hex(frame[6]));
+  seq++;
+  const name = "/" + stamp + "_" + String(seq).padStart(3, "0") + "_" + tag + ".syx";
+  const dir = dumpDirs.find((p) => save(p + name, frame));
+  if (dir) {
+    dumpDirs = [dir];
+    sidlog("capture", "saved " + frame.length + " bytes to " + dir + name);
+    outlet(1, "saved", dir + name);
+  } else {
+    sidlog("capture", "not saved: " + dumpDirs.join(" or ") + " does not exist (create it to keep dumps) – hex follows in the console");
+    post(frame.map(hex).join(" ") + "\n");
   }
 }
 

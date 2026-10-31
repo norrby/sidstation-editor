@@ -37,6 +37,11 @@ All notable changes to SidStation Editor are listed here, newest first. The form
   play another sound than the editor shows, and to ask for Push patch first.
 - While the synth stores, MIDI clock from the track is dropped instead of held, so a running clock
   cannot crowd out the held notes.
+- The log file's folder is now named after the editor: create `Library/Logs/SidStation-Editor`
+  (macOS) or `Documents\SidStation-Editor\logs` (Windows) in your home folder to get `max.log`.
+- A release no longer saves received patch dumps as `.syx` files; only a development build does,
+  in `Documents/SidStation-Editor/dumps`. The README's Data folders section is gone; the log is
+  described under Development.
 
 ### Fixed
 

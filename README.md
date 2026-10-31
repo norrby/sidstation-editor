@@ -147,17 +147,6 @@ sends to the synth only through one gateway (`max/sid.send.js`):
 - OS update frames can never pass, and neither can the frame that clears every patch (id 01).
 - The device has no network port: only Live reaches the gateway.
 
-## Data folders
-
-Max cannot create folders, so these are used only if you create them in your home folder:
-
-| Folder | What |
-|---|---|
-| `Documents/SidStation/dumps` | every patch dump received is saved here as `.syx` |
-| `Library/Logs/SidStation` (macOS), `Documents/SidStation/logs` (Windows) | `max.log`, a log for troubleshooting (everything also goes to the Max console) |
-
-On Windows the home folder is `C:\Users\<name>`; this has not been tried on Windows yet.
-
 ## Firmware
 
 Pull, Store and the settings request use SysEx messages (ids 05, 06 and 07) that the stock
@@ -191,6 +180,11 @@ npm test
 | `tools/` | command-line tools |
 
 Node 24 or later.
+
+For troubleshooting the editor also writes its log to a file, `max.log`, once you have created its folder in your
+home folder: `Library/Logs/SidStation-Editor` on macOS (Library is hidden in Finder: Go → Go to Folder… and type
+`~/Library/Logs`), `Documents\SidStation-Editor\logs` on Windows. A development build (`npm run build`) also saves
+every patch dump it receives as `.syx` in `Documents/SidStation-Editor/dumps`, if that folder exists.
 
 Why a build step: the device is not drawn in Max but described in `build/`, which places every
 control and writes the `.amxd`. Each `v8` object in Max loads one file, so the build joins the
