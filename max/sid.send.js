@@ -254,7 +254,7 @@ const midiIn = midiParser({                                          // lib/midi
   realtime: (b) => { count([b]); play([b]); },
   channel: (m) => {
     count(m);
-    // A program change from the track's input selects a slot on the synth (its name then blinks until ENTER): logged, so it can be told apart from the editor
+    // A program change from the track's input loads that patch on the synth at once (like choosing it and pressing ENTER): logged, so it can be told apart from the editor
     if ((m[0] & 0xf0) === 0xc0) sidlog("send", "track input: program change", m[1], "on channel", (m[0] & 0x0f) + 1);
     if (changesSound(m)) touched();                 // Store needs a new Push: the synth no longer has the editor's sound
     play(m);

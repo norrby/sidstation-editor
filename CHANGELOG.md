@@ -23,6 +23,8 @@ All notable changes to SidStation Editor are listed here, newest first. The form
 - The README's Setup says how to set External Instrument's Hardware Latency and Push's aftertouch.
 - The help text for a table step's note on Push named the notes the SidStation way; it shows Live's
   names, like the table on screen.
+- Detune's help text said at most half a semitone; measured on the synth it is a full semitone
+  either way.
 - Shorter help texts for Push patch, Pull patch and Store patch in Live's Info View: the note to
   programs driving the editor stays in Patch Action and the device description.
 
