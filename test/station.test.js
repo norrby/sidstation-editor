@@ -334,3 +334,12 @@ test("SidStation: no Ready parameter (its change after load was a step in Live's
   const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", NAME + ".amxd")).json.patcher;
   assert.ok(!p.boxes.some((b) => b.box.varname === "d_ready"));
 });
+
+test("SidStation: every widget script in dist carries the log helpers and the shared palette (a frozen device once had widgets without lib/ui.js, and the tables never started)", () => {
+  const read = (f) => fs.readFileSync(path.join(__dirname, "..", f), "utf8");
+  const maxlog = read("lib/maxlog.js"), ui = read("lib/ui.js");
+  for (const f of ["sid.adsr.js", "sid.pulse.js", "sid.table.js", "sid.name.js", "sid.tip.js"]) {
+    const s = read("dist/" + f);
+    assert.ok(s.startsWith(maxlog) && s.includes(ui), f);
+  }
+});
