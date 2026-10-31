@@ -15,6 +15,7 @@ All notable changes to SidStation Editor are listed here, newest first. The form
   Store patch is refused in the same state. After Push patch a notice by the button says the sound
   can now be saved. Store and Pull go to the patch number the synth's display shows, also while it
   flashes before ENTER.
+- The README's Setup says how to set External Instrument's Hardware Latency and Push's aftertouch.
 - Shorter help texts for Push patch, Pull patch and Store patch in Live's Info View: the note to
   programs driving the editor stays in Patch Action and the device description.
 

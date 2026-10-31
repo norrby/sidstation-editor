@@ -107,6 +107,10 @@ One MIDI track does everything:
   the editor. (*In* silences the clips.)
 - In Live's MIDI settings, keep *Remote* off for the synth's ports: with it on, Live itself sends
   mapped values to the synth.
+- **Hardware Latency** on External Instrument: set it as for any external synth. The editor adds
+  no delay; about 20 ms put the SidStation in time with Live's own instruments here.
+- **Aftertouch** reaches the synth as channel pressure (an LFO's control source). On Push, choose
+  *Mono* aftertouch in its setup: the polyphonic kind is not what the synth reads.
 
 If the synth's MIDI In light blinks but replies never reach the editor, Live may have lost the
 input port: restart Live.
