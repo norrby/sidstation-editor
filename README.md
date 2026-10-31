@@ -64,7 +64,7 @@ Not affiliated with or endorsed by Elektron. Use at your own risk.
 
 1. Download `SidStation-Editor-<version>.amxd` from the latest release on the
    [Releases](https://github.com/norrby/sidstation-editor/releases) page. It is a single frozen file:
-   the scripts and icons are inside.
+   the scripts and icons are inside. What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 2. Put it in your User Library, for example `User Library/Presets/MIDI Effects/Max MIDI Effect/`, or
    drag it straight from the download folder.
 3. Drag **SidStation Editor** onto a MIDI track.

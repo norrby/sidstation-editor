@@ -1,0 +1,59 @@
+# Changelog
+
+All notable changes to SidStation Editor are listed here, newest first. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the version numbers follow
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html). Every release is also on the
+[Releases](https://github.com/norrby/sidstation-editor/releases) page, with the device file to download.
+
+## [Unreleased]
+
+### Added
+
+- **Patch Number** on Push, the leftmost knob of the Patch bank: P00 to P99 sends a program change,
+  and the synth switches to that patch at once. The editor does not read the patch back; turn the
+  knob, then Pull patch when you want the editor to show it. The knob has no control on screen.
+- The Max log counts what the track sends to the synth, per message type and second. It showed
+  that Push's polyphonic aftertouch keeps the MIDI lamp blinking while a key is held.
+
+### Fixed
+
+- The overview's tip is drawn in front of the patch name instead of behind it.
+
+## [0.3.0] - 2026-10-27
+
+Version 0.2.0 was skipped; its changes are part of this release.
+
+### Added
+
+- **Edit the waveform tables on Push 2:** a bank per oscillator edits the table step by step,
+  including length and loop.
+- A note shows when an oscillator plays its waveform table, and points out the table.
+- **Patch Action:** a Live parameter (not on screen) with the choices None, Pull patch, Push patch
+  and Store patch, for automation, MIDI mapping and Live's API. It does the action and returns to
+  None. Map a button to it, not a knob.
+- **Help texts for every parameter**, also those with no control on screen, and a device
+  description for programs driving the editor through Live's API: edits reach the synth at once,
+  and Pull, Push and Store patch are never chosen unless asked.
+- **Windows:** the dump and log folders are looked for in the user's Documents folder. Not yet
+  tried on Windows.
+- README with screenshots, an architecture overview and a reading guide for anyone reading the code.
+- `npm run release` freezes the device into one file.
+
+## [0.1.0] - 2026-10-24
+
+First release.
+
+### Added
+
+- Every patch parameter as a Live parameter: automation, MIDI mapping and presets.
+- Push patch sends the editor's sound to the synth; Pull and Store with the modified firmware.
+- CC 119 on the track (from a clip or a controller button) pushes the patch, at most once every
+  5 seconds.
+- Push 2 banks: Main, Patch, Filter, Filter Env, three per oscillator and two per LFO.
+- The patch name becomes the device name, shown in Push's header.
+- Loading a Live Set sends nothing to the synth; every message to it is validated and goes through
+  one gateway.
+
+[Unreleased]: https://github.com/norrby/sidstation-editor/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/norrby/sidstation-editor/compare/v0.1.0...v0.3.0
+[0.1.0]: https://github.com/norrby/sidstation-editor/releases/tag/v0.1.0
