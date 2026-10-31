@@ -20,8 +20,8 @@ All notable changes to SidStation Editor are listed here, newest first. The form
   after a set was loaded it would have saved the synth's sound, not the editor's. Patch Action's
   Store patch is refused in the same state. After Push patch a notice by the button says the sound
   can now be saved. A program change or a patch CC from the track's own clips greys it too. The
-  help texts now say that Store and Pull use the patch number the synth's display shows, also while
-  it flashes before ENTER.
+  help texts now say that Store and Pull use the patch number the synth's display shows, even one not
+  yet selected on the synth.
 - The device no longer listens on UDP port 9871. It was a development aid for sending commands from
   the terminal, and anything on the local network could reach the synth through it.
 - The editor never sends the SysEx frame that clears every patch on the synth (id 01), not even as
@@ -33,6 +33,16 @@ All notable changes to SidStation Editor are listed here, newest first. The form
   either way.
 - Shorter help texts for Push patch, Pull patch and Store patch in Live's Info View: the note to
   programs driving the editor stays in Patch Action and the device description.
+- The device description tells a program driving the editor that after a set loads the synth may
+  play another sound than the editor shows, and to ask for Push patch first.
+- While the synth stores, MIDI clock from the track is dropped instead of held, so a running clock
+  cannot crowd out the held notes.
+
+### Fixed
+
+- Loading a set where an oscillator's Pitch was set to Note sent that note to the synth. Pitch
+  (Key follow | Note) and its note are two Live parameters for one synth setting, and only the
+  first of them counted as restored.
 
 ## [0.3.2] - 2026-10-31
 

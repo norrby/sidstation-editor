@@ -212,9 +212,10 @@ const LAYOUTS = {};
   const { json, layout, width } = buildDevice(DEVICE);
   // Live's Info View for the device itself (empty, Live showed a generic "MIDI Effect" text)
   json.patcher.description = DEVICE + " " + VERSION + ". Editor for the Elektron SidStation: every patch parameter as a Live parameter, with Pull, Push and Store patch. Not affiliated with Elektron.\n\n"
-    + "For a program driving the device through Live's API: every change to a parameter goes to the synth right away. A program must never choose Pull patch or Push patch "
+    + "For a program driving the device through Live's API: every change to a parameter goes to the synth right away. After a set loads, the synth may still play "
+    + "another sound than the editor shows, and setting a control to the value it already shows sends nothing; ask the user to press Push patch before shaping a sound. A program must never choose Pull patch or Push patch "
     + "unless the user asks for it, and must never choose Store patch unless the user explicitly asks to store. Pull patch replaces every setting in the editor with the "
-    + "synth's current slot; Push patch sends the whole editor state together, for example after a saved set has been loaded (loading sends nothing); Store patch "
+    + "patch number the synth shows; Push patch sends the whole editor state together, for example after a saved set has been loaded (loading sends nothing); Store patch "
     + "overwrites the patch number the synth shows for good, and is allowed only right after Push patch (greyed and refused otherwise). Patch Action (None, Pull patch, Push patch, Store patch) presses those buttons and goes back to None by itself. A waveform table is edited through Osc n Table Step, set first in a call of its own, then the step's Table Wave, Mod, "
     + "Pitch and Note or Offset; Table Length, Loop and Loop To apply to the whole table, which plays only while Table Speed is above 0. Osc n Table Data is the editor's own storage; "
     + "Osc n Table Clear empties the table and sets Table Speed to 0, so never choose it unless the user asks. Parameters with the values hidden/shown only show or hide panels and do not change the sound. The patch name is Name 1 to Name 10 "

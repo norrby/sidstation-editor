@@ -25,8 +25,8 @@ Not affiliated with or endorsed by Elektron. Use at your own risk.
 - **Osc 3 "Mod only"** (the SID's 3OFF): oscillator 3 keeps running for sync and ring modulation
   without being heard.
 - **Push patch** sends the whole editor state to the synth's edit buffer. Right after it **Store
-  patch** is available: it saves that sound to the patch number the synth's display shows (also
-  while the number flashes, before ENTER), overwriting it for good. Store saves what the synth has,
+  patch** is available: it saves that sound to the patch number the synth's display shows (even one
+  not yet selected on the synth), overwriting it for good. Store saves what the synth has,
   so any change after Push greys it until the next Push patch: what is saved is always what the
   editor shows.
 - **CC 119** (value above 0) on the track, from a clip or a controller button, pushes the patch too,
