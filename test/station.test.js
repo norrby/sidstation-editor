@@ -172,8 +172,7 @@ test("SidStation (one track): no global bus; midiout is fed only by the built-in
   const fromIn = p.lines.filter((l) => l.patchline.source[0] === min).map((l) => l.patchline.destination[0]).sort();
   assert.deepEqual(fromIn, [cap, osc1].sort(), "midiin -> capture and the osc 1 router only");
   assert.ok(!p.lines.some((l) => l.patchline.source[0] === cap && l.patchline.destination[0] === mout), "capture never to midiout");
-  const [udp] = id(/^udpreceive 9871$/);
-  assert.ok(into(gate).some((s) => s[0] === udp), "terminal control (tools/sid.js) -> gateway");
+  assert.ok(!boxes.some((b) => /^udp/.test(text(b) || "")), "no network port: nothing outside Live reaches the gateway");
 });
 
 test("SidStation: Push banks of 8 by long name; no show/hide tabs, table data, name letters or patch buttons", () => {

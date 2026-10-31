@@ -4,7 +4,7 @@
 // SAFETY: the SidStation's OS lives in PROM and can be destroyed by wrong SysEx
 // (a chip has had to be reprogrammed before). Three rules apply here:
 //  1. Only validated messages go out: patch frames that validateFrame()
-//     accepts (id 01/02/03), Direct Program frames that validateDPFrame()
+//     accepts (id 02/03; id 01, which clears the whole patch memory, is always refused), Direct Program frames that validateDPFrame()
 //     accepts AND that are in the params.js whitelist (dpRows),
 //     channel messages with the right length and 7-bit data, and the dump request (id 05,
 //     validateRequestFrame: exactly 9 bytes, slot 0..99 or 7F; only for a firmware with
@@ -19,7 +19,7 @@
 //  one call, so a note can never land inside it.
 //
 // [v8 sid.send.js] outlet 0 -> [midiout]. Outlet 1: "status <text>",
-// "progress <i> <n>". Messages (also as OSC via [udpreceive], "/cc 42 127"):
+// "progress <i> <n>". Messages (from the patcher only: the device has no network port):
 //   load <path>     validate and load a .syx bank;  send   queue all frames;  stop
 //   gap <ms>        extra pause after each patch frame (default 150)
 //   cc <nr> <v>     note <pitch> <vel>     pc <n>     (channel 1)
@@ -144,6 +144,7 @@ function accept(m, what) {
   if (m[0] === 0xf0) {
     if (m[m.length - 1] !== 0xf7 || m.slice(1, -1).some((b) => b > 0x7f)) return refuse(what, "malformed SysEx");
     if (!hasSidHeader(m)) return refuse(what, "not a SidStation frame");
+    if (m[6] === ID_CLEAR) return refuse(what, "01 clears every patch on the synth and is never sent");
     if (m[6] === ID_DP) {
       const v = validateDPFrame(m);
       if (!v.ok) return refuse(what, v.reason);

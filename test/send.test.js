@@ -120,3 +120,11 @@ test("Store patch needs Push patch first: refused until pushed, allowed after, g
   w.pushed(); w.frame(...S.encodeRequest(0x7f)); run(); out.length = 0;   // Pull replaces the editor
   assert.deepEqual(storable(), [0, 1, 0, 1, 0]);
 });
+
+test("the frame that clears every patch (id 01) is refused, however it arrives", () => {
+  const { w, out, status } = loadGateway();
+  const CLEAR = [0xf0, 0x00, 0x20, 0x3c, 0x01, 0x00, 0x01, 0x45].concat(Array(14).fill(0x2d), [0xf7]);
+  assert.ok(S.validateFrame(CLEAR).ok, "a well-formed 01 frame (validateFrame still recognises it, for checking bank files)");
+  w.frame(...CLEAR);
+  assert.deepEqual(out, []); assert.match(status.pop(), /^REFUSED bus: 01 clears every patch/);
+});

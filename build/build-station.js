@@ -173,10 +173,6 @@ function buildDevice(title) {
       A.line(oscs[1].vV8, 0, vGate, 0), A.line(vGate, 0, vMidiout, 0));
     for (const [r, k] of routers) lines.push(A.line(r, k, vGate, 0));
     ctx.armTargets.push(vGate);                                            // "arm" on load: the gateway answers "storable 0", so Store starts grey
-    // Terminal control (tools/sid.js: cc, dp, request, settings, load/send a bank …) straight into the gateway.
-    const vUdp = id();
-    boxes.push(A.obj(vUdp, "udpreceive 9871", [140, 500, 100, 20], 1, [""]));
-    lines.push(A.line(vUdp, 0, vGate, 0));
   }
   for (const t of ctx.armTargets) lines.push(A.line(vArm, 0, t, 0));
 

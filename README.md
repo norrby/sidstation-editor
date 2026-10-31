@@ -145,7 +145,8 @@ sends to the synth only through one gateway (`max/sid.send.js`):
 - One queue, one message at a time; nothing else goes out while the synth stores a patch.
 - Incoming SysEx is never passed on. A frame of a kind only the editor sends that comes back in is
   reported as a loop.
-- OS update frames can never pass.
+- OS update frames can never pass, and neither can the frame that clears every patch (id 01).
+- The device has no network port: only Live reaches the gateway.
 
 ## Data folders
 
@@ -168,9 +169,7 @@ the stock OS 1.10.
 ## Command line
 
 ```
-node tools/validate-bank.js bank.syx [--clean out.syx]   # check a .syx bank before sending it
-node tools/sid.js cc 42 127                               # control the editor in Live over UDP 9871
-node tools/sid.js request 127                             # dump request (needs the modified firmware)
+node tools/validate-bank.js bank.syx [--clean out.syx]   # check a .syx bank
 ```
 
 ## Development
