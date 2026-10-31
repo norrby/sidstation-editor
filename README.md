@@ -62,12 +62,24 @@ Not affiliated with or endorsed by Elektron. Use at your own risk.
 
 ## Install
 
-1. Download `SidStation-Editor-<version>.amxd` from the latest release on the
+1. Download `SidStation-Editor.amxd` from the latest release on the
    [Releases](https://github.com/norrby/sidstation-editor/releases) page. It is a single frozen file:
    the scripts and icons are inside. What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
 2. Put it in your User Library, for example `User Library/Presets/MIDI Effects/Max MIDI Effect/`, or
    drag it straight from the download folder.
-3. Drag **SidStation Editor** onto a MIDI track.
+3. Drag **SidStation-Editor** onto a MIDI track.
+
+### Upgrading
+
+Download the new `SidStation-Editor.amxd` and overwrite the old one. A Live Set refers to the device by
+its file, and restores every value by the parameter's name, so a set made with any earlier version
+opens with the new device and keeps its settings; parameters the old version did not have start at
+their defaults. The file name has no version in it for this reason, and a parameter never changes
+its name after a release. The version a set was last saved with is kept in the set (the hidden
+Version parameter) and written to the log when the device loads.
+
+Sets made with 0.3.1 or earlier refer to a file with the version in its name: drag the new device
+in once and set it up again, or point the set at the new file with Live's File Manager.
 
 ### From source
 
@@ -180,8 +192,8 @@ Why a build step: the device is not drawn in Max but described in `build/`, whic
 control and writes the `.amxd`. Each `v8` object in Max loads one file, so the build joins the
 shared code in `lib/` (the parameter table, the SysEx checks, the MIDI parser) with each script in
 `max/`; the tests run the same `lib/` files in Node. The layout, the Push banks and the help texts
-are computed by the build as well. `npm run release` builds and freezes the device into one file
-in `release/`.
+are computed by the build as well. `npm run release` builds and freezes the device into one file,
+`release/<version>/SidStation-Editor.amxd`.
 
 ## License
 

@@ -7,6 +7,17 @@ All notable changes to SidStation Editor are listed here, newest first. The form
 
 ## [Unreleased]
 
+### Added
+
+- The version is kept in the Live Set, as a hidden Version parameter, and written to the log when
+  the device loads: the log says what a set was last saved with. The device's description in Live's
+  Info View shows the version too.
+
+### Changed
+
+- The release file is `SidStation-Editor.amxd`, with no version in its name: upgrading is
+  overwriting the file, and every set keeps its settings. See Upgrading in the README.
+
 ## [0.3.1] - 2026-10-31
 
 ### Added

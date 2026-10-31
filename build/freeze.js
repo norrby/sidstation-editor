@@ -1,5 +1,7 @@
 // freeze.js – a frozen .amxd for a release, as Max's Freeze Device writes it: the device and every file it uses in one file.
-//   node build/freeze.js [device.amxd] [out.amxd]     default: dist/<productName>.amxd -> release/<productName with dashes>-<version>.amxd
+//   node build/freeze.js [device.amxd] [out.amxd]     default: dist/<productName>.amxd -> release/<version>/<productName with dashes>.amxd
+// The file name has no version in it: a Live Set refers to the device by its file, so a user upgrades by overwriting the file, and
+// the set restores every value by the parameters' long names. The version is inside the device (sid.version.js, the description).
 // Format (read from a device Max froze): "ampf" u32(4) "mmmm" | "meta" u32(4) u32(7) | "ptch" u32(len) and in it, big-endian:
 // "mx@c" u32(16) u32(0) u32(offset of dlst) | the patcher JSON | the files, one after another | "dlst" u32(len) and per file
 // "dire" u32(len) with the fields type, fnam (name + NUL, padded to 4), sz32, of32 (offset from "mx@c"), vers 0, flag (0x11
@@ -12,7 +14,7 @@ const { execSync } = require("child_process");
 const ROOT = path.join(__dirname, "..");
 const { productName, version } = require(path.join(ROOT, "package.json"));
 const src = path.resolve(process.argv[2] || path.join(ROOT, "dist", productName + ".amxd"));
-const out = path.resolve(process.argv[3] || path.join(ROOT, "release", productName.replace(/ /g, "-") + "-" + version + ".amxd"));
+const out = path.resolve(process.argv[3] || path.join(ROOT, "release", version, productName.replace(/ /g, "-") + ".amxd"));
 const dir = path.dirname(src);
 
 // The patcher JSON from an unfrozen device ("ptch" u32 JSON).
