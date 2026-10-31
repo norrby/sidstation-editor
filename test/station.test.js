@@ -343,3 +343,20 @@ test("SidStation: every widget script in dist carries the log helpers and the sh
     assert.ok(s.startsWith(maxlog) && s.includes(ui), f);
   }
 });
+
+test("SidStation: every short name is unique, since Live's API shows only the short name; each dial keeps its old label as a live.comment", () => {
+  const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", NAME + ".amxd")).json.patcher;
+  const vos = p.boxes.map((b) => b.box.saved_attribute_attributes && b.box.saved_attribute_attributes.valueof).filter((v) => v && v.parameter_longname);
+  const shorts = vos.map((v) => v.parameter_shortname), dup = shorts.filter((s, i) => shorts.indexOf(s) !== i);
+  assert.deepEqual(dup, []);
+  const byLong = (l) => vos.find((v) => v.parameter_longname === l).parameter_shortname;
+  assert.deepEqual(["Osc 1 Attack", "Osc 2 Table Speed", "Osc 2 Fixed Note", "Osc 2 Table Note", "Filter Cutoff", "Filter Env", "LFO3 Lace Speed", "Poly"].map(byLong),
+    ["A Osc1", "Speed Tbl Osc2", "Note Osc2", "Note Tbl Osc2", "Cut Filt", "Show Env Filt", "Lace Sp LFO3", "Poly"]);
+  const box = (v) => p.boxes.find((b) => b.box.varname === v).box;
+  assert.equal(box("o1_attack").showname, 0);
+  const label = box("o1_attack_label");
+  assert.deepEqual([label.maxclass, label.text, label.ignoreclick], ["live.comment", "A", 1]);
+  const dial = box("o1_attack").presentation_rect, lr = label.presentation_rect;
+  assert.deepEqual([lr[0], lr[2]], [dial[0], dial[2]], "the label above the dial");
+  assert.ok(lr[1] + lr[3] <= dial[1], "the dial (without its name) below its label");
+});

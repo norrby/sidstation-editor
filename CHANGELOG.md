@@ -15,6 +15,11 @@ All notable changes to SidStation Editor are listed here, newest first. The form
 
 ### Changed
 
+- **Every parameter's short name is unique**, so a program reading the device through Live's API
+  (which shows only short names) can tell the four A, D, S and R apart. The short name puts the
+  parameter first and its group last: "A Osc1", "Speed Tbl Osc2", "Cut Filt", "Lace Sp LFO3";
+  patch-wide parameters keep their name. Push shows the new names; the device looks as before. Long
+  names, and with them saved sets, automation and MIDI mappings, are unchanged.
 - **Store patch is greyed until Push patch has been pressed**, and greyed again by any change after
   that, so what it saves is always what the editor shows. Store saves what the synth has, so right
   after a set was loaded it would have saved the synth's sound, not the editor's. Patch Action's

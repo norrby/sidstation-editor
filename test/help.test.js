@@ -11,7 +11,7 @@ test("SidStation: every presented control has annotation_name and annotation", (
   const p = readAmxd(path.join(__dirname, "..", "dist", NAME + ".amxd")).json.patcher;
   const silent = (b) => b.filename === "sid.voicebg.js" || b.filename === "sid.section.js" || b.filename === "sid.tip.js";   // backgrounds and the tooltip layer
   const missing = p.boxes.map((x) => x.box)
-    .filter((b) => b.presentation && /^live\.|^v8ui$|^textedit$/.test(b.maxclass) && !silent(b))
+    .filter((b) => b.presentation && /^live\.|^v8ui$|^textedit$/.test(b.maxclass) && !silent(b) && !b.ignoreclick)   // a dial's label lets the mouse through to the dial
     .filter((b) => !b.annotation || !b.annotation_name).map((b) => b.varname);
   assert.deepEqual(missing, []);
 });

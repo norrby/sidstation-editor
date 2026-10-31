@@ -27,6 +27,7 @@ const { FVOICE_W, filterPanel } = require("./station/filter");
 const { LVOICE_W, lfoPanel } = require("./station/lfo");
 const { MAP_TOTAL, mapPanel } = require("./station/overview");
 const { parameters } = require("./station/banks");
+const { renameAll } = require("./station/names");
 
 // The device: the overview, voices 1–3, the filter, LFO 1–4, and the one-track plumbing (gateway, capture).
 const OSCS = [1, 2, 3];
@@ -185,6 +186,7 @@ function buildDevice(title) {
   const inner = (v) => /oscframe|envframe|^f_frame$|^l\d_frame$|^mapinnerframe$/.test(v);    // sub-panels (also the filter's f_frame and the LFOs' l<n>_frame)
   const bgsVn = boxes.filter((b) => b.box.filename === "sid.voicebg.js").map((b) => b.box.varname);   // the voice backgrounds furthest back
   const backs = panelsVn.filter(inner).concat(panelsVn.filter((v) => !inner(v)), bgsVn);
+  renameAll(boxes, panels);                                             // unique short names for Live's API; the dials keep their labels
   const layout = { panels, backs, fronts: ["name", "tip"] };   // the name display in front of the overview's v8ui (the text field is raised when shown), the tooltip layer in front of that
   const width = L.compute(layout, L.initialState(layout)).width;            // all oscillators visible, LFO 1 selected
   p.openrect = [0, 0, width, 169];

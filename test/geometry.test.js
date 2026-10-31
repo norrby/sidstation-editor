@@ -19,7 +19,7 @@ function problems(layout, state) {
   const out = [];
   for (const o of ops) if (o.rect[1] < 0 || o.rect[1] + o.rect[3] > HEIGHT) out.push("outside the height: " + o.name);
   for (const a of ops) for (const b of ops) {
-    if (a.name >= b.name || ALLOWED.has(a.name + " × " + b.name)) continue;
+    if (a.name >= b.name || ALLOWED.has(a.name + " × " + b.name) || b.name === a.name + "_label") continue;   // a dial's label lies on its name line
     const r = a.rect, q = b.rect;
     const dx = Math.min(r[0] + r[2], q[0] + q[2]) - Math.max(r[0], q[0]), dy = Math.min(r[1] + r[3], q[1] + q[3]) - Math.max(r[1], q[1]);
     if (dx > TOL && dy > TOL) out.push(a.name + " × " + b.name + " (" + dx + "×" + dy + ")");
