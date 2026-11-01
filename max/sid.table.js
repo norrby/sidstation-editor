@@ -569,6 +569,7 @@ const migrate = new Task(() => {
   if (!legacy) return;
   const old = legacy; legacy = null;
   if (cells.some((v, i) => v !== CELL_INIT[i])) { sidlog("table", "the Step parameters hold a table already: the old one is not moved"); return; }
+  if (!old.len && old.b[0] !== 0xfe) { sidlog("table", "the older table is empty: nothing to move"); return; }   // the cells say the same; telling Live would be a needless undo step
   bytes.apply(this, old.b);                                                 // writes the cells (out)
   if (old.len >= MAXCOL && n !== old.len) { n = old.len; out(); }           // a full table (no command) is not told apart by bytes()
   format = 2; try { notifyclients(); } catch (e) {}

@@ -233,6 +233,9 @@ test("a table from an older editor (the blob, format 1) moves into the Step para
   const b = loadWidget();
   b.w.migrate();
   assert.deepEqual(b.out.filter((s) => /^cell/.test(s)), []); assert.equal(b.notified.length, 0);
+  const e = loadWidget();                                                   // an empty old table: the cells say the same, nothing is told
+  e.w.setvalueof(1, 0, 0xff); e.w.migrate();
+  assert.deepEqual(e.out.filter((s) => /^cell/.test(s)), []); assert.equal(e.notified.length, 0);
   const c = loadWidget();                                                   // the cells already hold a table: the old one is left
   c.w.cell(0, 0x103c); c.w.cell(1, 0xff00);
   c.w.setvalueof(1, 2, 0x10, 0x3c, 0x20, 0xff, 0xff); c.w.migrate();
