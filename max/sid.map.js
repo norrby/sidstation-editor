@@ -154,7 +154,7 @@ const NOTICE_AFTER_MS = 1500, NOTICE_MS = 10000;
 let notice = null;
 const noticeOff = new Task(() => { notice = null; showTip(); }, this);
 const noticeOn = new Task(() => {
-  notice = { x: -6, y: 166, lines: ["The synth may not match the editor.", "To sync: dump the patch from the", "synth (MIDI > SYSEXDump = Patch),", "or press Push patch to send this one."] };
+  notice = { x: -6, y: 166, lines: ["The synth may not match the editor.", "To sync: dump the patch from the", "synth (MIDI > SYSEXDump = Patch),", "or press [Push patch] to send this one."] };
   showTip(); noticeOff.schedule(NOTICE_MS);
 }, this);
 noticeOn.schedule(NOTICE_AFTER_MS);
