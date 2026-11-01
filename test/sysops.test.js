@@ -49,12 +49,12 @@ function loadGateway() {
   const g = { midiParser, sidlog, sidguard, ...S, SidParams, Task, inlets: 0, outlets: 0, post() {}, arrayfromargs: (a) => Array.from(a), messagename: "x",
     outlet: (o, ...a) => { if (o === 0) out.push(a[0]); else if (a[0] === "status") status.push(a[1]); else if (a[0] === "noreply") warn.push(a[1]); else if (a[0] === "answered") warn.push("ok " + a[1]); } };
   const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.send.js"), "utf8").replace(/^inlets = 1;\noutlets = 2;\n/m, "");
-  const fn = new Function(...Object.keys(g), src + "\nreturn { stored, replied, frame, pushed, get queue() { return queue; }, get storing() { return storing; } };");
+  const fn = new Function(...Object.keys(g), src + "\nreturn { stored, replied, frame, get queue() { return queue; }, get storing() { return storing; } };");
   // Runs the queue Task's ticks (not the store timeout) a number of times.
   const ticks = (n) => { for (let k = 0; k < n; k++) for (const t of tasks) if (t.due !== undefined && t.due < 3000 && !t.cancelled) { t.due = undefined; t.fn(); } };
   const timeout = () => { for (const t of tasks) if (t.due === 3000 && !t.cancelled) { t.due = undefined; t.fn(); } };
   const w = fn(...Object.values(g));
-  // What the routers send, as frames (the only way in besides the replies and "pushed")
+  // What the routers send, as frames (the only way in besides the replies)
   Object.assign(w, { cc: (n, v) => w.frame(0xb0, n, v), store: () => w.frame(...S.encodeStore()), request: (n) => w.frame(...S.encodeRequest(n)),
     settings: () => w.frame(...S.encodeSettingsRequest()) });
   return { w, out, status, warn, ticks, timeout };
@@ -72,7 +72,7 @@ const frames = (out) => {                                                  // Sy
 
 test("store lock: after 07 nothing goes to the synth until the 47 reply; a second store is refused", () => {
   const { w, out, status, ticks } = loadGateway();
-  w.pushed(); w.store();                                                   // Store needs Push first (send.test.js)
+  w.store();
   assert.deepEqual(out, S.encodeStore());
   assert.ok(w.storing, "locked after sending 07");
   w.cc(42, 1); w.request(127); w.store();
@@ -87,7 +87,7 @@ test("store lock: after 07 nothing goes to the synth until the 47 reply; a secon
 
 test("store lock: a missing reply times out as uncertain, then the queue moves on", () => {
   const { w, out, status, ticks, timeout } = loadGateway();
-  w.pushed(); w.store(); w.cc(1, 2); ticks(10);
+  w.store(); w.cc(1, 2); ticks(10);
   assert.equal(frames(out).length, 1);
   timeout();
   assert.ok(status.some((s) => /NO REPLY .* may or may not have been stored/.test(s)) && !w.storing);
@@ -103,7 +103,7 @@ test("no reply: 05 and 06 are timed like the store; an answer in time ends the w
   assert.deepEqual(warn.splice(0), ["ok dump", "settings"]);
   assert.ok(status.some((s) => /settings request: NO REPLY within 3000 ms/.test(s)));
   assert.ok(!status.some((s) => /dump request: NO REPLY/.test(s)));
-  w.pushed(); w.store(); timeout();
+  w.store(); timeout();
   assert.deepEqual(warn.splice(0), ["store"], "the store timeout warns the same way");
   ticks(5); w.request(5); w.request(6); ticks(5); timeout();
   assert.deepEqual(warn.splice(0), ["dump"], "a second request restarts the wait: one warning");

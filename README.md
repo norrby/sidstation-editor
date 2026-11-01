@@ -24,11 +24,13 @@ Not affiliated with or endorsed by Elektron. Use at your own risk.
 - **LFOs 1–4:** type, speed, depth, fade-in, sample & hold, note-on/off sync, with a curve view.
 - **Osc 3 "Mod only"** (the SID's 3OFF): oscillator 3 keeps running for sync and ring modulation
   without being heard.
-- **Push patch** sends the whole editor state to the synth's edit buffer. Right after it **Store
-  patch** is available: it saves that sound to the patch number the synth's display shows (even one
-  not yet selected on the synth), overwriting it for good. Store saves what the synth has,
-  so any change after Push greys it until the next Push patch: what is saved is always what the
-  editor shows.
+- **Push patch** sends the whole editor state to the synth's edit buffer. **Store patch** saves the
+  synth's sound to the patch number the synth's display shows (even one not yet selected on the
+  synth), overwriting it for good. Store saves what the synth has, so press Push patch first if the
+  editor shows something else.
+- After loading, the device says for a few seconds that the synth may not match the editor, and how
+  to sync them: dump the patch from the synth (System > MIDI > SYSEXDump = Patch), or press Push
+  patch to send the editor's.
 - **CC 119** (value above 0) on the track, from a clip or a controller button, pushes the patch too,
   at most once every 5 seconds. Put it at the start of a song so the synth plays what the editor
   shows. The editor keeps CC 119 to itself; it never reaches the synth.

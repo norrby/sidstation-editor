@@ -148,15 +148,16 @@ function paint() {
 // Own tooltip (v8ui has none): shown when the mouse rests over a disabled ring arrow. Drawn by the tooltip layer in front of
 // the overview (sid.tip.js, outlet 1), so the patch name display, which lies in front of this box, never hides it.
 let tip = null;   // { x, y, lines: [...] }
-// The Store notice: after Push patch the gateway says "storable 1" (build-station.js), and the tooltip layer shows for a few seconds,
-// down by the Store button, that the sound can now be saved on the synth. "storable 0" (any change) only greys the button.
-let notice = null, noticeTask = null;
-function storable(v) {
-  if (noticeTask) { noticeTask.cancel(); noticeTask = null; }
-  notice = v ? { x: -6, y: 166, lines: ["Store patch saves this sound", "to the synth's patch number"] } : null;
-  if (notice) { noticeTask = new Task(() => { notice = null; noticeTask = null; showTip(); }); noticeTask.schedule(5000); }
-  showTip();
-}
+// The load notice: when the device has loaded, the synth may play another sound than the editor shows (loading sends
+// nothing). The tooltip layer says so for NOTICE_MS, down by the Pull/Push buttons; the editor keeps no state about it.
+const NOTICE_AFTER_MS = 1500, NOTICE_MS = 10000;
+let notice = null;
+const noticeOff = new Task(() => { notice = null; showTip(); }, this);
+const noticeOn = new Task(() => {
+  notice = { x: -6, y: 166, lines: ["The synth may not match the editor.", "To sync: dump the patch from the", "synth (MIDI > SYSEXDump = Patch),", "or press Push patch to send this one."] };
+  showTip(); noticeOff.schedule(NOTICE_MS);
+}, this);
+noticeOn.schedule(NOTICE_AFTER_MS);
 function showTip() { const t = tip || notice; if (t) outlet(1, "tip", t.x, t.y, ...t.lines); else outlet(1, "tip"); }
 // What is under the mouse, including things that cannot be clicked? -> text or null
 function hoverText(x, y) {
@@ -247,5 +248,5 @@ function bang() {
 function onresize() { mgraphics.redraw(); }
 function anything() { post("sid.map: unknown message " + messagename + "\n"); }
 
-paint = sidguard("map", paint); onclick = sidguard("map", onclick); set = sidguard("map", set); onidle = sidguard("map", onidle); storable = sidguard("map", storable);
+paint = sidguard("map", paint); onclick = sidguard("map", onclick); set = sidguard("map", set); onidle = sidguard("map", onidle);
 sidlog("map", "loaded");

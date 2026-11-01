@@ -15,8 +15,6 @@ All notable changes to SidStation Editor are listed here, newest first. The form
 
 ### Changed
 
-- **Push patch stays lit until everything has been sent** to the synth, so a press is seen even
-  while the editor is busy sending (the button used to stay dark).
 - **The waveform tables are Live parameters**: one per cell of the synth's table, "Osc n Step 00" to
   "Osc n Step 64" (value DATA1 × 256 + DATA2, as the synth stores it). A program driving the editor
   through Live's API can now read and write the tables, and every table edit is ordinary Live undo.
@@ -32,13 +30,10 @@ All notable changes to SidStation Editor are listed here, newest first. The form
   parameter first and its group last: "A Osc1", "Speed Tbl Osc2", "Cut Filt", "Lace Sp LFO3";
   patch-wide parameters keep their name. Push shows the new names; the device looks as before. Long
   names, and with them saved sets, automation and MIDI mappings, are unchanged.
-- **Store patch is greyed until Push patch has been pressed**, and greyed again by any change after
-  that, so what it saves is always what the editor shows. Store saves what the synth has, so right
-  after a set was loaded it would have saved the synth's sound, not the editor's. Patch Action's
-  Store patch is refused in the same state. After Push patch a notice by the button says the sound
-  can now be saved. A program change or a patch CC from the track's own clips greys it too. The
+- **After loading, the device says for a few seconds that the synth may not match the editor**, and
+  how to sync them: dump the patch from the synth, or press Push patch. Loading still sends nothing. The
   help texts now say that Store and Pull use the patch number the synth's display shows, even one not
-  yet selected on the synth.
+  yet selected on the synth, and that Store saves what the synth has.
 - The device no longer listens on UDP port 9871. It was a development aid for sending commands from
   the terminal, and anything on the local network could reach the synth through it.
 - The editor never sends the SysEx frame that clears every patch on the synth (id 01), not even as

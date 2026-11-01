@@ -22,12 +22,6 @@
 //   frame <bytes…>  a complete message from a router; validated as above
 //   stored <status> <slot> <size> <sum> <free>        the 47 reply (from the capture): ends the store lock
 //   replied dump|settings                             a 02/03 dump or a 46 reply came in (from the capture)
-//   pushed          Push patch is done (sent after every router queued its frames): the synth has the editor's sound, Store may go
-//   arm             on load: says the Store state ("storable 0") so the button starts grey
-// Store goes grey again after any change: a router frame, a request, a failed queue, and from the track a program
-// change or a CC that sets a patch parameter (changesSound).
-// "pushing 1|0" on outlet 1: the Push button lit while what Push patch queued is being sent.
-// "storable 0|1" on outlet 1: Store patch is allowed only right after Push patch (the button is greyed otherwise, see below).
 // Every request that expects an answer is timed (Live can lose its input port, and Pull then just does nothing): 05 -> a dump, 06 -> 46, 07 -> 47. No answer within 3 s: a log line and
 // "noreply <dump|settings|store>" on outlet 1, and "sent" after every router frame (the name display shows NO REPLY until "answered" – any reply – or a click).
 
@@ -42,21 +36,6 @@ const STORE_TIMEOUT_MS = 3000;
 const DP_ROWS = SidParams.dpRows();          // the DP whitelist, built once
 const REPLY_TIMEOUT_MS = 3000;
 const waiting = { dump: null, settings: null };   // the Tasks that time out a 05 / 06 request, or null
-// Store needs Push first. Store writes the synth's edit buffer, not the editor, so it is allowed only while the edit buffer is known
-// to hold the editor's sound: from "pushed" (the Push button or CC 119, which arrives after every router has queued its frames)
-// until anything else goes to the synth or a dump is requested (Pull replaces the editor). A store itself keeps the state, so a
-// sound can be stored to a second patch number. "storable 0|1" on outlet 1 greys the Store button and shows the notice
-// (build-station.js); a store while not storable is refused, also from Patch Action.
-let storable = false;
-// "pushing 1|0" on outlet 1 keeps the Push button lit from "pushed" until the queue is empty (the button lights itself when pressed).
-let pushing = false;
-function pushed() {
-  storable = true; outlet(1, "storable", 1); status("pushed: the synth has the editor's sound, Store patch saves it to the patch number on the synth");
-  pushing = queue.length > 0; outlet(1, "pushing", pushing ? 1 : 0);
-}
-function pushDone() { if (!pushing) return; pushing = false; outlet(1, "pushing", 0); }
-function touched() { if (!storable) return; storable = false; outlet(1, "storable", 0); }
-function arm() { outlet(1, "storable", storable ? 1 : 0); }
 
 // --- the queue ------------------------------------------------------------------
 
@@ -75,16 +54,16 @@ function pace(m) {
 // drop the queue and say so (the store lock, if any, still ends by its reply or timeout).
 function drain() {
   try { drainOne(); }
-  catch (e) { queue = []; task = null; touched(); pushDone(); status("STOP: error while sending (" + e.message + "), queue dropped"); }
+  catch (e) { queue = []; task = null; status("STOP: error while sending (" + e.message + "), queue dropped"); }
 }
 function drainOne() {
   if (!task) return;
   if (storing) { task.schedule(10); return; }                // store lock: nothing to the synth until the reply
-  if (!queue.length) { task = null; pushDone(); return; }
+  if (!queue.length) { task = null; return; }
   const m = queue.shift();
   if (m[0] === 0xf0) {                                       // last check right before sending
     const v = validate(m);
-    if (!v.ok) { queue = []; task = null; touched(); pushDone(); status("STOP: frame failed validation while sending (" + v.reason + ")"); return; }
+    if (!v.ok) { queue = []; task = null; status("STOP: frame failed validation while sending (" + v.reason + ")"); return; }
   }
   for (const b of m) outlet(0, b);
   if (m[0] === 0xf0 && m[6] === ID_STORE) lockStore();
@@ -157,7 +136,6 @@ function accept(m, what) {
       const v = validate(m);
       if (!v.ok) return refuse(what, v.reason);
       if (m[6] === ID_STORE && (storing || queue.some((q) => q[0] === 0xf0 && q[6] === ID_STORE))) return refuse(what, "a store is already pending");
-      if (m[6] === ID_STORE && !storable) return refuse(what, "Store patch needs Push patch first");
     }
   } else {
     const len = CH_LEN[m[0] >> 4];
@@ -190,28 +168,22 @@ const midiIn = midiParser({                                          // lib/midi
     count(m);
     // A program change from the track's input loads that patch on the synth at once (like choosing it on the synth's panel): logged, so it can be told apart from the editor
     if ((m[0] & 0xf0) === 0xc0) sidlog("send", "track input: program change", m[1], "on channel", (m[0] & 0x0f) + 1);
-    if (changesSound(m)) touched();                 // Store needs a new Push: the synth no longer has the editor's sound
     play(m);
   },
   sysex: () => sidlog("send", "REFUSED SysEx on the note path"),
   broken: () => sidlog("send", "REFUSED SysEx on the note path"),
 });
 function msg_int(b) { midiIn(b); }                                   // a declared function: Max looks msg_int up on the global object
-// From the track (a clip, a controller): a program change, or a CC that sets a patch parameter, changes the synth's edit buffer.
-// Playing controls do not: mod wheel (1), the LFO control sources (20-23) and sustain (64), nor notes, bend or pressure.
-const PLAYING_CC = new Set([1, 20, 21, 22, 23, 64]);
-function changesSound(m) { const t = m[0] & 0xf0; return t === 0xc0 || (t === 0xb0 && !PLAYING_CC.has(m[1])); }
 
 // From a router: "frame <bytes…>", one complete message at a time.
 function frame() {
   const m = arrayfromargs(arguments).map(Number);
   if (!accept(m, "bus")) return;
-  if (!(m[0] === 0xf0 && (m[6] === ID_STORE || m[6] === ID_SETTINGS))) touched();   // a store or a settings request changes nothing
   status("bus: " + (m[0] === 0xf0 ? "DP " + m.slice(7, 12).map((b) => b.toString(16)).join(" ") : m.map((b) => b.toString(16)).join(" ")));
   outlet(1, "sent");                                                 // a control was used: the name display closes an open field
 }
 
-const COMMANDS = { stored, replied, frame, pushed, arm };
+const COMMANDS = { stored, replied, frame };
 
 function anything() {
   const name = String(messagename).replace(/^\//, "");

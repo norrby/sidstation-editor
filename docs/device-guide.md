@@ -66,7 +66,7 @@ The editor edits the synth's edit buffer, never patch memory directly.
 
 - **Push patch** sends the whole editor state.
 - **Pull patch** reads the patch the synth's display shows into the editor.
-- **Store patch** writes the edit buffer to the patch number the display shows, overwriting it for good. It is allowed only right after Push patch.
+- **Store patch** writes the edit buffer to the patch number the display shows, overwriting it for good. It saves what the synth has, so Push patch first when the editor's sound is the one to keep.
 - **Patch Number** selects one of the synth's patches P00–P99 by program change.
 
 These are `Patch Action` (None, Pull patch, Push patch, Store patch) and `Patch Number`. Both are ask-first: change them only when the user asks. Never choose Store unless the user explicitly asks to store.

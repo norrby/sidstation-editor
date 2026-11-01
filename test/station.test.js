@@ -27,7 +27,7 @@ function loadUi(file, size, extra) {
   const rects = []; let ink = null;                                     // every rectangle with the colour it was drawn in
   mg.set_source_rgba = (...a) => { ink = [].concat(...a); }; mg.rectangle = (x, y, w, h) => rects.push({ x, y, ink });
   let t = 0;
-  const g = { UI, sidlog, sidguard, mgraphics: mg, inlets: 0, outlets: 0, post() {}, outlet: (o, ...a) => out.push(a.join(" ")), arrayfromargs: (a) => Array.from(a), messagename: "x",
+  const g = { UI, sidlog, sidguard, mgraphics: mg, inlets: 0, outlets: 0, post() {}, outlet: (o, ...a) => out.push(a.join(" ")), arrayfromargs: (a) => Array.from(a), messagename: "x", Task: class { constructor(fn) { this.fn = fn; } schedule() {} cancel() {} },
     Date: { now: () => (t += 5000) } };   // every call "5 s later": the load-time click guard does not trigger
   const src = fs.readFileSync(path.join(__dirname, "..", "max", file), "utf8").replace(/^inlets = 1;\noutlets = 2;\n/m, "");
   return { w: new Function(...Object.keys(g), src + "\nreturn { " + extra + " };")(...Object.values(g)), out, rects };
@@ -260,30 +260,19 @@ test("SidStation: Patch Action is an automated parameter off screen and off Push
   const [delay] = from(t, 0); assert.equal(text(delay), "delay 50", "the reset in its own event, or Live ignores it");
   const [zero] = from(delay, 0); assert.equal(text(zero), "0"); assert.deepEqual(from(zero, 0), [menu.box.id], "back to None as a value");
   const [sel] = from(t, 1); assert.equal(text(sel), "sel 1 2 3");
-  const [fetch, pushT, store] = [0, 1, 2].map((o) => from(sel, o)[0]);
-  assert.deepEqual([text(fetch), text(pushT), text(store)], ["fetch", "t b b", "store"], "the buttons' own messages, Push through its trigger");
-  assert.deepEqual([text(from(pushT, 0)[0]), text(from(pushT, 1)[0])], ["pushed", "sendall"], "sendall first (right outlet), then pushed to the gateway");
+  const [fetch, push, store] = [0, 1, 2].map((o) => from(sel, o)[0]);
+  assert.deepEqual([text(fetch), text(push), text(store)], ["fetch", "sendall", "store"], "the buttons' own messages");
 });
 
-test("SidStation: Store patch is greyed until Push patch – the gateway's storable state reaches the button and the overview, pushed and arm reach the gateway; Push stays lit while sending", () => {
+test("SidStation: Pull, Push and Store patch are plain buttons; the gateway keeps no state about the synth's sound", () => {
   const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", NAME + ".amxd")).json.patcher;
   const text = (id) => (p.boxes.find((b) => b.box.id === id) || { box: {} }).box.text;
   const from = (id, outlet) => p.lines.filter((l) => l.patchline.source[0] === id && l.patchline.source[1] === outlet).map((l) => l.patchline.destination[0]);
   const byVar = (v) => p.boxes.find((b) => b.box.varname === v).box;
-  const gate = byVar("gateway"), store = byVar("c_store"), map = byVar("map");
-  const [route] = from(gate.id, 1); assert.equal(text(route), "route noreply answered sent storable pushing");
-  const push = byVar("c_sendall");
-  assert.equal(push.mode, 1, "Push patch is a toggle, lit until the gateway says pushing 0");
-  assert.deepEqual(from(from(route, 4)[0], 0), [push.id]); assert.equal(text(from(route, 4)[0]), "prepend set");
-  assert.deepEqual(from(route, 3).map(text).sort(), ["active $1", "prepend storable"]);
-  assert.deepEqual(from(from(route, 3).find((id) => text(id) === "active $1"), 0), [store.id], "greys the Store button");
-  assert.deepEqual(from(from(route, 3).find((id) => text(id) === "prepend storable"), 0), [map.id], "the overview shows the notice");
-  const intoGate = p.lines.filter((l) => l.patchline.destination[0] === gate.id).map((l) => text(l.patchline.source[0]));
-  assert.ok(intoGate.includes("pushed"), "the Push trigger's marker"); assert.ok(intoGate.includes("arm"), "arm on load: Store starts grey");
-  assert.equal(intoGate.filter((t) => t === "pushed").length, 1, "one pushed message box, fed by the button and by CC 119");
-  const pushed = p.boxes.find((b) => b.box.text === "pushed").box;
-  const feeders = p.lines.filter((l) => l.patchline.destination[0] === pushed.id).map((l) => text(l.patchline.source[0]));
-  assert.deepEqual(feeders, ["t b b", "t b b"]);
+  const gate = byVar("gateway");
+  for (const v of ["c_fetch", "c_sendall", "c_store"]) assert.equal(byVar(v).mode, 0, v + " is momentary");
+  const [route] = from(gate.id, 1); assert.equal(text(route), "route noreply answered sent");
+  assert.ok(!p.boxes.some((b) => ["pushed", "arm"].includes(b.box.text) && from(b.box.id, 0).includes(gate.id)), "no pushed or arm into the gateway");
 });
 
 test("SidStation: the Version parameter is stored only, off screen and off Push, and wired both ways to sid.version.js with the build's version", () => {
