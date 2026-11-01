@@ -1,6 +1,6 @@
 # SidStation Editor
 
-A Max for Live editor for the Elektron SidStation, a 1999 synth module built around the MOS 6581 SID chip of the Commodore 64. Every sound parameter of the synth's edit buffer is a Live parameter. A change is sent to the synth over MIDI as soon as it is made, and the synth's audio comes back through an External Instrument after the editor.
+A Max for Live editor for the Elektron SidStation, a 1999 synth module built around the MOS 6581 SID chip of the Commodore 64. Every sound parameter of the synth's edit buffer is a Live parameter. A change is sent to the synth over MIDI as soon as it is made, through the track's MIDI To. How the synth's audio comes back into Live (an audio track, or Live's External Instrument after the editor) is up to the user.
 
 ## Signal path
 
@@ -13,7 +13,7 @@ Sync and ring modulation link each oscillator to the previous one: 2 to 1, 3 to 
 
 ## Oscillators
 
-- **Waveform:** `Osc n Wave` is Tri, Saw, Pulse, Mixed or Noise. Mixed is the chip's combined Tri+Pulse, and its pulse width behaves unpredictably. `Osc n Sync` restarts this oscillator's waveform at each cycle of the previous oscillator. `Osc n Ring` ring-modulates the previous oscillator, and the chip does that only with Tri or Mixed.
+- **Waveform:** `Osc n Wave` is Tri, Saw, Pulse, Mixed, Noise or Off (silent). Mixed is the chip's combined Tri+Pulse, and its pulse width behaves unpredictably. `Osc n Sync` restarts this oscillator's waveform at each cycle of the previous oscillator. `Osc n Ring` ring-modulates the previous oscillator, and the chip does that only with Tri or Mixed.
 - **Pulse width:** `PWM Start` (1 = thin, 64 = square), `PWM Add` (sweeps the width by itself), `PWM Sync` (restarts the sweep at each note), and `PWM LFO` with `PWM LFO Depth`. They affect only Pulse and Mixed.
 - **Envelope:** `Attack`, `Decay`, `Sustain` and `Release`, each 0–15. The steps are coarse: Attack goes from 2 ms to 8 s, Decay and Release from 6 ms to 24 s. `Gate` replaces the chip's envelope with plain on/off at the Sustain level. It gives tight timing, but the chip can leave a faint ghost sound a few seconds later. `Delay` starts the oscillator a number of update cycles late.
 - **Pitch:** `Track Mode` is Key follow, or Note with `Fixed Note`. Also `Transpose` (±24), `Detune` (up to a semitone either way), `PB Range`, `Porta Speed` and `Arp Speed`. The arpeggio plays held notes one at a time, in the order they were pressed, and 0 turns it off.

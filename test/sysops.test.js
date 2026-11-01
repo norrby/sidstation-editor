@@ -46,7 +46,7 @@ test("47 reply: status, slot, size, checksum, free", () => {
 function loadGateway() {
   const out = [], status = [], tasks = [], warn = [];
   class Task { constructor(fn) { this.fn = fn; tasks.push(this); } schedule(ms) { this.due = ms; this.cancelled = false; } cancel() { this.cancelled = true; } }
-  const g = { midiParser, sidlog, sidguard, ...S, SidParams, Task, inlets: 0, outlets: 0, post() {}, arrayfromargs: (a) => Array.from(a), messagename: "x",
+  const g = { midiParser, sidlog, sidguard, ...S, SidParams, SID_DEV: true, Task, inlets: 0, outlets: 0, post() {}, arrayfromargs: (a) => Array.from(a), messagename: "x",
     outlet: (o, ...a) => { if (o === 0) out.push(a[0]); else if (a[0] === "status") status.push(a[1]); else if (a[0] === "noreply") warn.push(a[1]); else if (a[0] === "answered") warn.push("ok " + a[1]); } };
   const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.send.js"), "utf8").replace(/^inlets = 1;\noutlets = 2;\n/m, "");
   const fn = new Function(...Object.keys(g), src + "\nreturn { stored, replied, frame, get queue() { return queue; }, get storing() { return storing; } };");
@@ -99,6 +99,7 @@ test("no reply: 05 and 06 are timed like the store; an answer in time ends the w
   const { w, status, warn, ticks, timeout } = loadGateway();
   w.request(127); w.settings(); ticks(5);                              // the timer starts when the request is sent, not queued
   w.replied("dump");                                                   // the dump came, the settings reply did not
+  ticks(5);                                                            // 06 waited in the queue while the dump was pending
   timeout();
   assert.deepEqual(warn.splice(0), ["ok dump", "settings"]);
   assert.ok(status.some((s) => /settings request: NO REPLY within 3000 ms/.test(s)));
@@ -106,7 +107,9 @@ test("no reply: 05 and 06 are timed like the store; an answer in time ends the w
   w.store(); timeout();
   assert.deepEqual(warn.splice(0), ["store"], "the store timeout warns the same way");
   ticks(5); w.request(5); w.request(6); ticks(5); timeout();
-  assert.deepEqual(warn.splice(0), ["dump"], "a second request restarts the wait: one warning");
+  assert.deepEqual(warn.splice(0), ["dump"], "the second request waits in the queue while the first is pending");
+  ticks(5); timeout();
+  assert.deepEqual(warn.splice(0), ["dump"], "then goes out and is timed on its own");
   w.replied("dump"); w.replied("settings");                            // late or stray replies: nothing happens
 });
 

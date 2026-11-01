@@ -7,6 +7,8 @@ All notable changes to SidStation Editor are listed here, newest first. The form
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-01
+
 ### Added
 
 - **A device guide** (docs/device-guide.md): a short text on the synth and the editor, from the
@@ -18,8 +20,9 @@ All notable changes to SidStation Editor are listed here, newest first. The form
 - **The waveform tables are Live parameters**: one per cell of the synth's table, "Osc n Step 00" to
   "Osc n Step 64" (value DATA1 × 256 + DATA2, as the synth stores it). A program driving the editor
   through Live's API can now read and write the tables, and every table edit is ordinary Live undo.
-  They are stored with the set, but not automated and not on Push. A table saved by an older editor
-  moves into them when the set is opened.
+  They are stored with the set (opening it sends none of them to the synth), but not automated and
+  not on Push. A table saved by an older editor
+  moves into them when the set is opened, without sending anything to the synth.
 - **A new editor starts as the synth's own New Patch**, the sound the synth gives a patch it
   creates, named "New Patch": oscillator 1 alone (2 and 3 off, set an octave up and down),
   nothing through the filter. Before, it started with a sound of its own that the synth never had.
@@ -37,7 +40,8 @@ All notable changes to SidStation Editor are listed here, newest first. The form
 - The device no longer listens on UDP port 9871. It was a development aid for sending commands from
   the terminal, and anything on the local network could reach the synth through it.
 - The editor never sends the SysEx frame that clears every patch on the synth (id 01), not even as
-  part of a bank.
+  part of a bank. The last check right before a frame goes out now refuses it too, and a Direct
+  Program frame outside the editor's list of parameters, not only the check where frames enter the queue.
 - The README's Setup says how to set External Instrument's Hardware Latency and Push's aftertouch.
 - The help text for a table step's note on Push named the notes the SidStation way; it shows Live's
   names, like the table on screen.
@@ -47,21 +51,42 @@ All notable changes to SidStation Editor are listed here, newest first. The form
   programs driving the editor stays in Patch Action and the device description.
 - The device description tells a program driving the editor that after a set loads the synth may
   play another sound than the editor shows, and to ask for Push patch first.
+- **Fast automation reaches the synth in time.** The editor sent at most one message to the synth
+  about every 11 ms, roughly 90 a second; faster automation queued up and arrived late, up to tens of
+  seconds after the clip. Now CC, program changes and Direct Program messages go out as soon as they
+  are made, whole and in order. Only a patch frame and a request to the synth are still followed by a
+  short pause. Nothing is sent ahead of time.
+- While Pull patch waits for the synth's dump, nothing else from the editor goes to the synth (the
+  track's notes still do): the synth stops reading incoming CC while it dumps, and too many would
+  overwrite each other. The wait ends when the dump arrives, or after 3 s.
 - While the synth stores, MIDI clock from the track is dropped instead of held, so a running clock
   cannot crowd out the held notes.
 - The log file's folder is now named after the editor: create `Library/Logs/SidStation-Editor`
   (macOS) or `Documents\SidStation-Editor\logs` (Windows) in your home folder to get `max.log`.
 - Received patch dumps are no longer saved as `.syx` files; the log gets their bytes as one line.
   The README's Data folders section is gone; the log is described under Development.
+- Patch Number's help text and the README no longer say that Store patch is greyed or
+  refused until Push patch, and the device guide lists Off among the waveforms.
 
 ### Fixed
 
+- **Attack, Decay and Release reach the synth while Gate is on.** Gate greyed the three dials by
+  switching them off, and a switched-off dial in Max holds back the values that automation, Push or
+  a program set, so the synth (and Push patch, and Store) got the old ones until Gate went off. Now
+  the dials are dimmed, like the editor's other greyed controls, can still be turned, and every value
+  goes out.
+- **The editor's own rules no longer overrule automation.** Choosing a waveform or Off switches the
+  oscillator on or off, and osc 3's Off and Filter clear each other; such a rule writes the other
+  parameter, which stopped that parameter's automation. While automation plays either parameter,
+  the rule now leaves both as the automation sets them.
 - **Undo and redo of the waveform tables.** Undoing an edit made through a table knob (Table Step,
   Wave, Length …) turned the knob back, and the editor took that as a new edit and wrote the table
   again, so the table ended up wrong and redo was lost. Now a knob turned by undo or redo leaves the
   table alone, and the table's own undo step puts it back. Live's restore of a table (on load, undo
   or redo) no longer adds undo steps of its own. A click in the table is one undo step; an edit
-  through the knobs is still several, but each undo leaves the table right.
+  through the knobs is still several, but each undo leaves the table right. Undoing a longer Length goes
+  straight back to the shorter table (it passed through a full table of 65 steps, all sent to the
+  synth), and the last redo of a knob edit no longer turns the step into a fixed note.
 - **A newly added editor can be undone away again.** On load it set a Push knob of each
   oscillator's waveform table (Table Note) although the table was empty; every such write is a step
   in Live's undo history, and each Cmd+Z made the editor write it back, so the device never went
@@ -70,6 +95,10 @@ All notable changes to SidStation Editor are listed here, newest first. The form
 - Loading a set where an oscillator's Pitch was set to Note sent that note to the synth. Pitch
   (Key follow | Note) and its note are two Live parameters for one synth setting, and only the
   first of them counted as restored.
+- A patch dump with a damaged byte (above 0F where the dump has a half byte) is no longer loaded into
+  the editor; the log says why.
+- A damaged table in a set saved by an older editor can no longer stop its move into the Step
+  parameters halfway.
 
 ## [0.3.2] - 2026-10-31
 
@@ -133,7 +162,8 @@ First release.
 - Loading a Live Set sends nothing to the synth; every message to it is validated and goes through
   one gateway.
 
-[Unreleased]: https://github.com/norrby/sidstation-editor/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/norrby/sidstation-editor/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/norrby/sidstation-editor/compare/v0.3.2...v1.0.0
 [0.3.2]: https://github.com/norrby/sidstation-editor/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/norrby/sidstation-editor/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/norrby/sidstation-editor/compare/v0.1.0...v0.3.0

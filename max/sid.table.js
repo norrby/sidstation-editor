@@ -401,6 +401,11 @@ function applyPush(key, v) {
   if (key === "target") { target = clamp(v, 0, Math.max(0, n - 1)); changed(); return; }
   if (cursor >= n) { sidlog("table", "push " + key + ": step " + cursor + " is beyond the table's " + n + " steps, turn Length first"); knobs(); return; }
   const s = steps[cursor];
+  // A Note or Offset the same as the step's own would only switch the pitch mode. No turn of the knob gives that (the knob shows it
+  // already), but the last redo of the editor's own knob write does: Live then has nothing more to redo, so it is not told apart.
+  if ((key === "note" && s.mode !== "F" && v === clamp(s.fixed, 0, 81)) || (key === "offset" && s.mode !== "rel" && v === s.rel)) {
+    sidlog("table", "push " + key + " " + v + ": the step's own value, the table is left as it is"); return;
+  }
   if (key === "wave") s.wave = clamp(v, 0, WAVES.length - 1);
   else if (key === "mod") { s.sync = v & 1; s.ring = (v >> 1) & 1; }
   else if (key === "pitch") s.mode = PITCH_MODES[clamp(v, 0, 2)];
@@ -494,11 +499,18 @@ function fromCells() {
   }
 }
 // A Step parameter's value. Several arrive together (a set loading, an undo of a drag), so the table is rebuilt once after them.
+// Live sends every Step parameter's value once when the device loads (a new device too, all 195, after the routers are armed): a
+// table changed by such a first value is the set's own, and goes to the router as the baseline, since loading sends nothing.
 const showCells = typeof LiveAPI === "undefined" ? null : new Task(() => showFromCells(), this);
+const cellSeen = [];
+let fromLoad = false;
 function cell(i, v) {
   i = Math.round(Number(i)); v = Math.round(Number(v));
-  if (!(i >= 0 && i < MAXCOL) || !Number.isFinite(v) || cells[i] === v) return;  // our own write coming back changes nothing
+  if (!(i >= 0 && i < MAXCOL) || !Number.isFinite(v)) return;
+  const first = !cellSeen[i]; cellSeen[i] = true;
+  if (cells[i] === v) return;                                                // our own write coming back changes nothing
   cells[i] = v;
+  if (first) fromLoad = true;
   if (legacy) migrate.schedule(MIGRATE_MS);
   if (showCells) showCells.schedule(0); else showFromCells();
 }
@@ -506,8 +518,8 @@ function showFromCells() {
   fromCells();
   sidlog("table", "from the Step parameters:", n, "steps,", n >= MAXCOL ? "full (no command)" : term === "loop" ? "loop to " + target : "end");
   cursor = Math.min(cursor, Math.max(0, n - 1));
-  restoring = true;
-  try { mgraphics.redraw(); out(); } finally { restoring = false; }
+  restoring = true; asBaseline = fromLoad; fromLoad = false;
+  try { mgraphics.redraw(); out(); } finally { restoring = false; asBaseline = false; }
 }
 
 // --- playhead (simulation of the OS's table player) ---------------------------
@@ -555,7 +567,7 @@ function loopmode(v) {
 // the set has settled (MIGRATE_MS after the last restore), that table is written into the cells and the blob is told it is format 2
 // – a few steps in Live's undo history, once, for such a set only. A new device has no stored blob and writes nothing.
 const MIGRATE_MS = 1000;
-let restoring = false, legacy = null, format = 2;
+let restoring = false, legacy = null, format = 2, asBaseline = false;   // the table goes to the router as "baseline": not sent
 function getvalueof() { return [format]; }
 function setvalueof() {
   const a = arrayfromargs(arguments).map(Number);
@@ -565,24 +577,30 @@ function setvalueof() {
   sidlog("table", "a table saved by an older editor (0.3.2 or earlier):", a[1], "steps");
   migrate.schedule(MIGRATE_MS);
 }
-const migrate = new Task(() => {
+const migrate = new Task(sidguard("table", () => {
   if (!legacy) return;
   const old = legacy; legacy = null;
-  if (cells.some((v, i) => v !== CELL_INIT[i])) { sidlog("table", "the Step parameters hold a table already: the old one is not moved"); return; }
-  if (!old.len && old.b[0] !== 0xfe) { sidlog("table", "the older table is empty: nothing to move"); return; }   // the cells say the same; telling Live would be a needless undo step
-  bytes.apply(this, old.b);                                                 // writes the cells (out)
-  if (old.len >= MAXCOL && n !== old.len) { n = old.len; out(); }           // a full table (no command) is not told apart by bytes()
+  if (cells.some((v, i) => v !== CELL_INIT[i])) { format = 2; sidlog("table", "the Step parameters hold a table already: the old one is not moved"); return; }
+  if (!old.len && old.b[0] !== 0xfe) { format = 2; sidlog("table", "the older table is empty: nothing to move"); return; }   // the cells say the same; telling Live would be a needless undo step
+  asBaseline = true;                                                        // loading sends nothing: the router takes it as the baseline
+  try {
+    bytes.apply(this, old.b);                                               // writes the cells (out)
+    if (old.len >= MAXCOL && n !== MAXCOL) { n = MAXCOL; out(); }           // a full table (no command) is not told apart by bytes()
+  } finally { asBaseline = false; }
   format = 2; try { notifyclients(); } catch (e) {}
   sidlog("table", "the older table moved into the Step parameters:", n, "steps");
-}, this);
+}), this);
 function out() {
   if (!restoring) {
     const c = cellsNow();
-    for (let i = 0; i < MAXCOL; i++) if (c[i] !== cells[i]) { cells[i] = c[i]; outlet(0, "cell", i, c[i]); }   // Live: one undo step each
+    // Live: one undo step each, undone in reverse order. The new End or Loop goes first, so every undo and redo step leaves a table
+    // with an end (written last, undoing a longer Length went through a full table of 65 steps, all sent to the synth).
+    for (const end of [true, false])
+      for (let i = 0; i < MAXCOL; i++) if (c[i] !== cells[i] && (c[i] >= CELL_LOOP) === end) { cells[i] = c[i]; outlet(0, "cell", i, c[i]); }
   }
   outlet(0, "steps", n, term, target);
   outlet(0, "loop", term === "loop" && n < MAXCOL ? 1 : 0);              // -> the button
-  outlet(0, ["bytes"].concat(encode()));
+  outlet(0, [asBaseline ? "baseline" : "bytes"].concat(encode()));
   if (!restoring) knobs();
 }
 function bang() { out(); }

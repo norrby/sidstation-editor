@@ -20,14 +20,14 @@ function loadFilter() {
   out.length = 0;
   return { f, out };
 }
-function loadUi(file, size, extra) {
+function loadUi(file, size, extra, automated = () => false) {
   const out = [];
   const mg = { size, init() {}, redraw() {}, text_measure: () => [8, 9] };
   for (const f of ["set_source_rgba", "rectangle", "fill", "set_line_width", "move_to", "line_to", "stroke", "ellipse", "select_font_face", "set_font_size", "show_text", "arc", "curve_to"]) mg[f] = () => {};
   const rects = []; let ink = null;                                     // every rectangle with the colour it was drawn in
   mg.set_source_rgba = (...a) => { ink = [].concat(...a); }; mg.rectangle = (x, y, w, h) => rects.push({ x, y, ink });
   let t = 0;
-  const g = { UI, sidlog, sidguard, mgraphics: mg, inlets: 0, outlets: 0, post() {}, outlet: (o, ...a) => out.push(a.join(" ")), arrayfromargs: (a) => Array.from(a), messagename: "x", Task: class { constructor(fn) { this.fn = fn; } schedule() {} cancel() {} },
+  const g = { UI, sidlog, sidguard, sidAutomated: automated, mgraphics: mg, inlets: 0, outlets: 0, post() {}, outlet: (o, ...a) => out.push(a.join(" ")), arrayfromargs: (a) => Array.from(a), messagename: "x", Task: class { constructor(fn) { this.fn = fn; } schedule() {} cancel() {} },
     Date: { now: () => (t += 5000) } };   // every call "5 s later": the load-time click guard does not trigger
   const src = fs.readFileSync(path.join(__dirname, "..", "max", file), "utf8").replace(/^inlets = 1;\noutlets = 2;\n/m, "");
   return { w: new Function(...Object.keys(g), src + "\nreturn { " + extra + " };")(...Object.values(g)), out, rects };
@@ -238,8 +238,33 @@ test("overview: a disabled ring arrow's tip goes to the tooltip layer, which lie
   w.set("ringok", 2, 0); out.length = 0; w.idle(G.laneRing, (G.rows[0] + G.rows[1]) / 2); assert.equal(out.length, 1); w.idleout(); assert.deepEqual(out.splice(1), ["tip"]);
   const L = require("../lib/layout");
   const layout = JSON.parse(/const LAYOUTS = (.*);\n/.exec(fs.readFileSync(path.join(__dirname, "..", "dist", "sid.layout.js"), "utf8"))[1])[NAME];
-  assert.deepEqual(layout.fronts, ["name", "tip"]);
-  assert.ok(L.messages(L.compute(layout, L.initialState(layout)).ops, null, layout.backs, layout.fronts).slice(-1)[0], "script bringtofront tip");
+  assert.deepEqual(layout.fronts.slice(-2), ["name", "tip"], "the name display and the tooltip layer raised last");
+  assert.equal(L.messages(L.compute(layout, L.initialState(layout)).ops, null, layout.backs, layout.fronts).slice(-1)[0], "script bringtofront tip");
+});
+
+test("SidStation: Gate dims A/D/R with a panel in front that lets the clicks through; the dials stay active, so automation and Push still go out", () => {
+  const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", NAME + ".amxd")).json.patcher;
+  const byVar = (v) => p.boxes.find((b) => b.box.varname === v).box;
+  const L = require("../lib/layout");
+  const layout = JSON.parse(/const LAYOUTS = (.*);\n/.exec(fs.readFileSync(path.join(__dirname, "..", "dist", "sid.layout.js"), "utf8"))[1])[NAME];
+  const st = L.initialState(layout);
+  const rectOf = (name) => { const o = L.compute(layout, st).ops.find((x) => x.name === name); return o && o.rect; };
+  st.o2.env = 1;
+  for (const k of ["attack", "decay", "release"]) {
+    const dim = byVar("o2_" + k + "dim");
+    assert.equal(dim.maxclass, "panel"); assert.equal(dim.ignoreclick, 1, k + ": the dial can still be turned through the dimmer");
+    assert.ok(layout.fronts.includes("o2_" + k + "dim"), k + ": raised in front of the dial and its label");
+    assert.ok(!rectOf("o2_" + k + "dim"), k + ": hidden while Gate is off");
+  }
+  assert.ok(!rectOf("o2_sustaindim"), "Sustain is not dimmed (with Gate it is the note's level)");
+  st.o2.gate = 1;
+  for (const k of ["attack", "decay", "release"]) {
+    const d = rectOf("o2_" + k + "dim"), dial = rectOf("o2_" + k);
+    assert.ok(d && d[0] <= dial[0] && d[1] <= dial[1] && d[0] + d[2] >= dial[0] + dial[2] && d[1] + d[3] >= dial[1] + dial[3], k + ": covers the dial");
+  }
+  const gate = byVar("o2_gate"), toLayout = p.boxes.find((b) => b.box.text === "prepend gate 2").box;
+  assert.ok(p.lines.some((l) => l.patchline.source[0] === gate.id && l.patchline.destination[0] === toLayout.id));
+  assert.ok(!p.boxes.some((b) => b.box.text === "prepend active" && p.lines.some((l) => l.patchline.source[0] === b.box.id && ["o2_attack", "o2_decay", "o2_release"].includes(p.boxes.find((x) => x.box.id === l.patchline.destination[0]).box.varname))), "no active 0 on the dials");
 });
 
 test("SidStation: Patch Action is an automated parameter off screen and off Push that fires the buttons' messages and resets to None", () => {
@@ -293,7 +318,7 @@ test("SidStation: the Version parameter is stored only, off screen and off Push,
   assert.deepEqual(from(js), [box.box.id], "the stamp goes back into the parameter");
 });
 
-test("SidStation: the Push table knobs are visible on Push only (not automated, no initial output, no presentation) and wired to the table", () => {
+test("SidStation: the Push table knobs are visible on Push only (not automated, no initial output but Note's, no presentation) and wired to the table", () => {
   const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", NAME + ".amxd")).json.patcher;
   const { PUSH_VISIBLE } = require("../build/station/common");
   const byVar = (v) => p.boxes.find((b) => b.box.varname === v);
@@ -304,7 +329,8 @@ test("SidStation: the Push table knobs are visible on Push only (not automated, 
     for (const key of ["step", "wave", "mod", "pitch", "note", "offset", "len", "loop", "target"]) {
       const b = byVar("o" + n + "_push" + key), vo = b.box.saved_attribute_attributes.valueof;
       assert.equal(vo.parameter_invisible, PUSH_VISIBLE, vo.parameter_longname);
-      assert.equal(vo.parameter_initial_enable, 0, vo.parameter_longname);
+      if (key === "note") assert.deepEqual([vo.parameter_initial_enable, vo.parameter_initial], [1, [48]], "Note starts at a new step's note");
+      else assert.equal(vo.parameter_initial_enable, 0, vo.parameter_longname);
       assert.ok(!b.box.presentation, vo.parameter_longname + " is not on screen");
       const pre = from(b.box.id);
       assert.equal(pre.length, 1); assert.equal(text(pre[0]), "prepend push " + key);
@@ -351,4 +377,17 @@ test("SidStation: every short name is unique, since Live's API shows only the sh
   const dial = box("o1_attack").presentation_rect, lr = label.presentation_rect;
   assert.deepEqual([lr[0], lr[2]], [dial[0], dial[2]], "the label above the dial");
   assert.ok(lr[1] + lr[3] <= dial[1], "the dial (without its name) below its label");
+});
+
+test("overview: osc 3's Off/Filter rules leave both alone while automation plays either one", () => {
+  const playing = new Set();
+  const { w, out } = loadUi("sid.map.js", [230, 163], "paint, onclick, set, bang, G", (name) => playing.has(name));
+  w.set("route", 3, 1); w.set("off3", 3, 0); out.length = 0;
+  playing.add("Off Osc3");
+  w.set("off3", 3, 1); assert.deepEqual(out.splice(0), [], "Off from automation: Filter is not written");
+  playing.clear(); w.set("off3", 3, 0); w.set("route", 3, 0); w.set("off3", 3, 1); out.length = 0;
+  playing.add("Filt Osc3");
+  w.set("route", 3, 1); assert.deepEqual(out.splice(0), [], "Filter from automation: Off is not written");
+  playing.clear(); w.set("route", 3, 0); w.set("off3", 3, 1); out.length = 0;
+  w.set("route", 3, 1); assert.deepEqual(out.splice(0), ["off3 0"], "no automation: the rule as before");
 });

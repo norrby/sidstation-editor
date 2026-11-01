@@ -7,18 +7,20 @@
 //                   back (an echo loop once wiped the synth's memory). Realtime (F8..FF) passes.
 //           "<param> <value>" from the hidden/visible live.* objects, the value in
 //                   the synth's own scale (e.g. transpose −24..24). Scaled to CC
-//                   with SidParams.toCC and sent as B0 cc v on channel 1 –
+//                   with SidParams.toCC and sent as B0 cc v (channel 1: Live gives everything
+//                   leaving the track the channel of its MIDI To, so the editor has none of its own) –
 //                   NOT through its own midiout but as "frame <bytes…>" on outlet 2 to the
 //                   gateway (sid.send.js), which queues and validates.
 //                   Parameters without a CC (wave, pwsync) go as Direct Program
 //                   SysEx (encodeDP, only documented rows from params.js).
 //           "trackmode 0|1" (Key follow | Note), "tracknote n": the Track controls -> param track.
 //           "table <bytes…>" the waveform table from sid.table.js; changed rows go as DP (four messages per row).
+//           "baseline <bytes…>" the table a set brought (Live's restore of the Step parameters, or an older set's table moved in):
+//                   taken as what the synth has, nothing sent.
 //           "sendall" sends every known value and the whole table (Push patch, e.g. after a patch change).
 //           "arm"     from [live.thisdevice]: the device has loaded, changes may now be sent.
 //           "quiet"   from sid.load.js: a patch dump is arriving in the panel – send nothing for 1.5 s
 //                   (the values come from the synth and must not be echoed back to it).
-//           "channel n" MIDI channel 1..16 for CC (default 1).
 // Outlet 0: the track's notes to [midiout] (on to External Instrument). Outlet 1: "status <text>", "ringok 0|1",
 //           "note 1|0" for every note on/off that passes (drives the table playheads), "setactive 0|1" (the waveform turned the
 //           oscillator on/off), "pushcc" (CC 119: Push patch). Outlet 2: "frame <bytes…>" to the gateway.
@@ -30,7 +32,6 @@ const osc = Math.max(1, Math.min(3, parseInt(jsarguments[1], 10) || 1));
 const defs = {};
 for (const d of SidParams.OSC) defs[d.key] = d;
 const val = {};
-let chan = 1;
 // Nothing is sent to the synth until Live has finished loading the device ([live.thisdevice]
 // -> "armed"). On load every live.* object outputs its value, and that must
 // NOT overwrite the synth's edit buffer (osc 1 kept getting switched off).
@@ -66,6 +67,9 @@ const WAVE_OFF = SidParams.OSC.find((d) => d.key === "wave").labels.indexOf("Off
 function followWave(v) {
   const want = v === WAVE_OFF ? 0 : 1;
   if (val.active === want) return;
+  // automation on either one decides (lib/liveparam.js): writing Active would stop its automation, and automation that sets the
+  // waveform is not a choice made now
+  if (sidAutomated("Wave Osc" + osc) || sidAutomated("Active Osc" + osc)) { sidlog("osc" + osc, "wave", v === WAVE_OFF ? "Off" : "chosen", "under automation: Active left as it is"); return; }
   sidlog("osc" + osc, "wave", v === WAVE_OFF ? "Off -> Active off" : "chosen -> Active on");
   outlet(1, "setactive", want);
 }
@@ -83,7 +87,7 @@ function msg_int(b) { midiIn(b); }                                   // a declar
 
 // --- to the synth: via the gateway (outlet 2 -> sid.send.js), never its own midiout ------
 function tx(bytes) { outlet.apply(null, [2, "frame"].concat(bytes)); }
-function sendCC(cc, v) { tx([0xb0 | (chan - 1), cc & 0x7f, v & 0x7f]); }
+function sendCC(cc, v) { tx([0xb0, cc & 0x7f, v & 0x7f]); }
 function sendBytes(bytes) { tx(bytes); }
 
 // CC wherever possible, Direct Program as fallback: CC is ordinary
@@ -145,6 +149,7 @@ function anything() {
 let tableSent = null, tableNow = [];
 function tableRows(b) {
   const rows = [];
+  if (b.some((x) => !Number.isInteger(x) || x < 0 || x > 0xff)) { sidlog("osc" + osc, "ERROR table refused: not bytes"); return null; }
   for (let k = 0; k < b.length && rows.length < SidParams.TABLE_ROWS; k += 2) {
     if (b[k] === 0xff) { rows.push([0xff, 0xff]); break; }
     rows.push([b[k] & 0xff, (b[k + 1] | 0) & 0xff]);
@@ -171,6 +176,15 @@ function table() {
   if (n) sidlog("osc" + osc, "table:", n, "rows sent");
 }
 
+// The table a set brought: Live restores the Step parameters after the router is armed, and an older set's table moves in a second
+// later (sid.table.js). The synth's table is unknown after a load, and loading sends nothing, so it only becomes the baseline (Push
+// patch sends it).
+function baseline() {
+  const rows = tableRows(arrayfromargs(arguments).map(Number));
+  if (!rows) return;
+  tableNow = rows; tableSent = tableNow.map((r) => r.slice());
+}
+
 function sendall() {
   armed = true; quietUntil = 0;
   for (const k in val) param(k, val[k]);
@@ -179,11 +193,10 @@ function sendall() {
   outlet(1, "status", "sent " + Object.keys(val).length + " parameters, " + tableNow.length + " table rows");
 }
 
-function channel(n) { chan = Math.max(1, Math.min(16, n | 0)); }
 
 function list() { /* lists, e.g. from live.menu outlet 2, are ignored */ }
 
 // Every handler wrapped in error capture that logs to logs/max.log.
 msg_int = sidguard("osc" + osc, msg_int); anything = sidguard("osc" + osc, anything); sendall = sidguard("osc" + osc, sendall);
-trackmode = sidguard("osc" + osc, trackmode); table = sidguard("osc" + osc, table); tracknote = sidguard("osc" + osc, tracknote); channel = sidguard("osc" + osc, channel); quiet = sidguard("osc" + osc, quiet);
+trackmode = sidguard("osc" + osc, trackmode); table = sidguard("osc" + osc, table); baseline = sidguard("osc" + osc, baseline); tracknote = sidguard("osc" + osc, tracknote); quiet = sidguard("osc" + osc, quiet);
 sidlog("osc" + osc, "loaded");

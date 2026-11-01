@@ -57,7 +57,7 @@ function filterValue(p, d) {
 
 function patch() {
   const p = arrayfromargs(arguments).map(Number);
-  if (p.length < DUMP_OSC_BASE[2] + 21 || p.some((b) => !Number.isFinite(b))) { sidlog("load", "invalid patch, length", p.length); return; }
+  if (p.length < DUMP_OSC_BASE[2] + 21 || p.some((b) => !Number.isInteger(b) || b < 0 || b > 0xff)) { sidlog("load", "invalid patch, length", p.length); return; }
   const name = String.fromCharCode.apply(null, p.slice(0, 10)).trim();
   const msgs = [];
   const send = (vn, v) => msgs.push([vn, v]);

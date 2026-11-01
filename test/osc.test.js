@@ -9,13 +9,13 @@ const SidParams = require("../lib/params");
 const { encodeDP } = require("../lib/sysex");
 
 // frames ("frame <bytes>" on the gateway outlet) are recorded as ["gw", "frame", bytes…]
-function loadRouter(oscNo, armed = true, restoreTrack = true) {
+function loadRouter(oscNo, armed = true, restoreTrack = true, automated = () => false) {
   const out = [];
-  const g = { midiParser, sidlog, sidguard, SidParams, encodeDP, inlets: 0, outlets: 0, jsarguments: ["sid.osc.js", oscNo], post() {},
+  const g = { midiParser, sidlog, sidguard, SidParams, encodeDP, sidAutomated: automated, inlets: 0, outlets: 0, jsarguments: ["sid.osc.js", oscNo], post() {},
     outlet: (o, ...a) => out.push(a[0] === "frame" ? ["gw", ...a] : [o, ...a]), arrayfromargs: (a) => Array.from(a), messagename: "x",
     Task: class { constructor(fn) { this.fn = fn; } schedule() {} cancel() {} } };
   const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.osc.js"), "utf8").replace(/^inlets = 1;\noutlets = 3;\n/m, "");
-  const fn = new Function(...Object.keys(g), src + "\nreturn { msg_int, param, sendall, arm, msg: (n, ...a) => { const fns = { trackmode, tracknote, sendall, arm, channel, quiet }; if (fns[n]) return fns[n](...a); messagename = n; anything(...a); } };");   // v8 calls named functions before anything
+  const fn = new Function(...Object.keys(g), src + "\nreturn { msg_int, param, sendall, arm, msg: (n, ...a) => { const fns = { trackmode, tracknote, sendall, arm, quiet }; if (fns[n]) return fns[n](...a); messagename = n; anything(...a); } };");   // v8 calls named functions before anything
   const r = fn.call({}, ...Object.values(g));
   for (const d of SidParams.OSC) r.param(d.key, SidParams.initOf(d, 1));                   // Live restores every parameter on load: the starting point
   if (restoreTrack) { r.msg("trackmode", 0); r.msg("tracknote", 60); }     // (Track is two Live parameters)
@@ -174,4 +174,15 @@ test("choosing Off switches the oscillator off, choosing a waveform switches it 
   assert.deepEqual(set(), []);
   r.msg("active", 1); r.sendall();
   assert.deepEqual(set(), [], "Push patch sends Off + Active as they are");
+});
+
+test("under automation the waveform leaves Active alone: neither when automation plays the waveform nor when it plays Active", () => {
+  for (const name of ["Wave Osc2", "Active Osc2"]) {
+    const { r, out } = loadRouter(2, true, true, (n) => n === name);       // restored: Saw, Active on
+    const set = () => out.filter((o) => o[0] === 1 && o[1] === "setactive").map((o) => o[2]);
+    r.msg("wave", 5); assert.deepEqual(set(), [], name + ": Off does not switch Active off");
+    assert.ok(bus(out).length > 0, name + ": the waveform itself is still sent");
+  }
+  const { r, out } = loadRouter(2, true, true, (n) => n === "Wave Osc1");   // another oscillator's automation does not count
+  r.msg("wave", 5); assert.deepEqual(out.filter((o) => o[1] === "setactive").map((o) => o[2]), [0]);
 });

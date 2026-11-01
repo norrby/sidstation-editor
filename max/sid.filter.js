@@ -19,7 +19,7 @@ const defs = {};
 for (const d of SidParams.FILTER.concat(SidParams.COMMON)) defs[d.key] = d;   // also patch-wide settings (poly, legato, hcut)
 const val = {};
 const fields = { filterRouting: 0x07, filterType: 0x01 };
-let armed = false, chan = 1;
+let armed = false;
 
 function arm() { if (!armed) sidlog("filter", "armed"); armed = true; }
 const armTask = new Task(arm);
@@ -65,7 +65,7 @@ function namechar(i, code) {
   catch (e) { sidlog("filter", "DP error namechar", i, "=", code, ":", e.message); }
 }
 function sendParam(d, v) {
-  if (d.cc !== undefined) { tx([0xb0 | (chan - 1), d.cc & 0x7f, SidParams.toCC(v, d.min, d.max) & 0x7f]); return; }
+  if (d.cc !== undefined) { tx([0xb0, d.cc & 0x7f, SidParams.toCC(v, d.min, d.max) & 0x7f]); return; }
   try { tx(encodeDP(d.dp[0], d.dp[1], d.dp[2], v)); }
   catch (e) { sidlog("filter", "DP error", d.key, "=", v, ":", e.message); }
 }
@@ -112,7 +112,6 @@ function store() {
   try { tx(encodeStore()); outlet(0, "status", "filter: store requested (current slot)"); sidlog("filter", "store: 07 7F"); }
   catch (e) { sidlog("filter", "store error:", e.message); }
 }
-function channel(n) { chan = Math.max(1, Math.min(16, n | 0)); }
 // Patch Slot: a program change, not a patch parameter: not in val, so Push patch never sends it, and a dump never sets it.
 let slotSeen = false;
 function slot(v) {
@@ -121,7 +120,7 @@ function slot(v) {
   v = Math.max(0, Math.min(99, v));                                      // the synth does not range-check 100..127
   if (!slotSeen) { slotSeen = true; if (armed) sidlog("filter", "first slot kept, not sent:", v); return; }   // Live's restore on load
   if (muted()) return;
-  tx([0xc0 | (chan - 1), v]);
+  tx([0xc0, v]);
   outlet(0, "status", "filter: program change " + v);
 }
 function anything() {

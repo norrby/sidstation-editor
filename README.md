@@ -9,6 +9,15 @@ patch-wide settings.
 
 Not affiliated with or endorsed by Elektron. Use at your own risk.
 
+## Quick start
+
+1. Drag `SidStation-Editor.amxd` onto a MIDI track.
+2. Set the track's *MIDI To* to the synth's port and channel, and *MIDI From* to *All Ins* (your
+   keyboard and the synth's replies).
+3. Make the synth and the editor alike: dump the patch from the synth (System > MIDI > SYSEXDump =
+   Patch), or press **Push patch**.
+4. Turn the dials and play. Details in [Install](#install) and [Setup in Live](#setup-in-live) below.
+
 ## Features
 
 - **Overview** after the SID datasheet's block diagram: oscillators, envelopes, the filter
@@ -35,13 +44,13 @@ Not affiliated with or endorsed by Elektron. Use at your own risk.
   at most once every 5 seconds. Put it at the start of a song so the synth plays what the editor
   shows. The editor keeps CC 119 to itself; it never reaches the synth.
 - Loading a Live Set or the device sends nothing to the synth.
-- **Pull patch / Store patch** and the settings request need a firmware with dump-request and
+- **Pull patch / Store patch** need a firmware with dump-request and
   store support (see below). With the stock OS the synth does not answer, and the editor shows
   **NO REPLY**.
 - Every value is a Live parameter: automation, MIDI mapping and presets work as usual.
 - **Patch Action** is a Live parameter (not on screen) with the choices None, Pull patch, Push patch
   and Store patch: setting it from automation, a MIDI mapping or Live's API does that action and
-  returns it to None. Store patch is refused unless Push patch came right before, like the button.
+  returns it to None.
   Map a button to it, not a knob: a knob sweeping through the choices does all three.
 - Every parameter has a help text in Live's Info View, also those with no control on screen, and
   the device description tells a program driving the editor through Live's API how to behave:
@@ -59,7 +68,7 @@ Not affiliated with or endorsed by Elektron. Use at your own risk.
 ## Requirements
 
 - Ableton Live 12 with Max for Live (Max 9, the `v8` objects).
-- A SidStation. Pull, Store and the settings request need OS 1.12 R01
+- A SidStation. Pull and Store need OS 1.12 R01
   ([sidstation-firmware](https://github.com/norrby/sidstation-firmware)); everything else uses only
   what the manual describes and has been tested with OS 1.10 R33.
 - **Not OS 1.11 R34:** its direct-parameter receiver is broken and writes outside the edit buffer,
@@ -101,15 +110,18 @@ its `.amxd` has changed.
 
 One MIDI track does everything:
 
-- **Devices:** `SidStation Editor`, then Live's **External Instrument** with *MIDI To* = the synth's port.
+- **Devices:** `SidStation Editor`. **MIDI To:** the synth's port.
 - **MIDI From:** a port that hears the synth's **MIDI Out** (the interface's input, or *All Ins*).
   It must never hear the track's own output through a loop.
 - **Monitor:** *Auto*, track armed: the keyboard, the track's clips and the synth's replies all reach
   the editor. (*In* silences the clips.)
+- **MIDI channel:** set the synth to receive on the channel in the track's *MIDI To*. Which parameters go as
+  CC and which as SysEx, and what a Live clip can record of them: [MIDI implementation](docs/midi-implementation.md).
 - In Live's MIDI settings, keep *Remote* off for the synth's ports: with it on, Live itself sends
   mapped values to the synth.
-- **Hardware Latency** on External Instrument: set it as for any external synth. The editor adds
-  no delay; about 20 ms put the SidStation in time with Live's own instruments here.
+- **The synth's audio in Live:** if you bring it back through Live's **External Instrument**, set its
+  *Hardware Latency* as for any external synth. The editor adds no delay; about 20 ms put the SidStation
+  in time with Live's own instruments here.
 - **Aftertouch** reaches the synth as channel pressure (an LFO's control source). On Push, choose
   *Mono* aftertouch in its setup: the polyphonic kind is not what the synth reads.
 

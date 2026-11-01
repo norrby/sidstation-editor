@@ -218,6 +218,13 @@ function onclick(x, y) {
   else if (h.ring !== undefined) { ring[h.ring] = ring[h.ring] ? 0 : 1; outlet(0, "ring", h.ring + 1, ring[h.ring]); }
   mgraphics.redraw();
 }
+// The two osc 3 rules below write the other parameter; not while automation plays either one (lib/liveparam.js): the values then
+// stay as the automation set them.
+function ruleBlocked() {
+  const blocked = sidAutomated("Off Osc3") || sidAutomated("Filt Osc3");
+  if (blocked) sidlog("map", "osc 3 Off/Filter under automation: left as they are");
+  return blocked;
+}
 function set() {
   const a = arrayfromargs(arguments);
   const n = a[1] | 0;
@@ -225,13 +232,13 @@ function set() {
   if (a[0] === "poly") poly = a[1] ? 1 : 0;
   else if (a[0] === "filter") filterShow = a[1] ? 1 : 0;
   else if (a[0] === "fenv") filterEnv = a[1] ? 1 : 0;
-  else if (a[0] === "off3" && a[2] && !off3 && route[2]) {
+  else if (a[0] === "off3" && a[2] && !off3 && route[2] && !ruleBlocked()) {
     // Osc 3's Off button pressed while it goes through the filter: 3OFF only cuts the direct path, so take it off the filter too
     // (the overview's step filter -> out -> off in one press).
     off3 = 1; route[2] = 0; outlet(0, "route", 3, 0);
   }
   else if (a[0] === "off3") off3 = a[2] ? 1 : 0;
-  else if (a[0] === "route" && n === 3 && a[2] && !route[2] && off3) {
+  else if (a[0] === "route" && n === 3 && a[2] && !route[2] && off3 && !ruleBlocked()) {
     // Osc 3's Filter button turned the filter on while 3OFF was set: clear 3OFF (it has no effect through the filter), so the next
     // press gives out like on osc 1/2 instead of off. Off is reached from the overview.
     route[2] = 1; off3 = 0; outlet(0, "off3", 0);

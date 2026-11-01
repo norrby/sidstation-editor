@@ -13,7 +13,7 @@ outlets = 2;
 const defs = {};
 for (const d of SidParams.LFO) defs[d.key] = d;
 const val = [{}, {}, {}, {}];
-let armed = false, chan = 1;
+let armed = false;
 
 function arm() { if (!armed) sidlog("lfo", "armed"); armed = true; }
 const armTask = new Task(arm);
@@ -25,7 +25,7 @@ const muted = () => !armed || Date.now() < quietUntil;
 function tx(bytes) { outlet.apply(null, [1, "frame"].concat(bytes)); }   // to the gateway (see sid.filter.js)
 function sendParam(n, d, v) {
   const cc = SidParams.lfoCC(n, d);
-  if (cc !== null) { tx([0xb0 | (chan - 1), cc & 0x7f, SidParams.toCC(v, d.min, d.max) & 0x7f]); return; }
+  if (cc !== null) { tx([0xb0, cc & 0x7f, SidParams.toCC(v, d.min, d.max) & 0x7f]); return; }
   const r = SidParams.lfoDP(n, d);
   try { tx(encodeDP(r.addr, r.mask, r.shift, v)); }
   catch (e) { sidlog("lfo", "DP error lfo", n, d.key, "=", v, ":", e.message); }
@@ -54,7 +54,6 @@ function sendall() {
   for (let n = 1; n <= 4; n++) for (const key of Object.keys(val[n - 1])) { sendParam(n, defs[key], val[n - 1][key]); k++; }
   outlet(0, "status", "lfo: sent " + k + " parameters");
 }
-function channel(n) { chan = Math.max(1, Math.min(16, n | 0)); }
 function anything() { sidlog("lfo", "unknown message", messagename); }
 
 lfo = sidguard("lfo", lfo); sendall = sidguard("lfo", sendall); quiet = sidguard("lfo", quiet);

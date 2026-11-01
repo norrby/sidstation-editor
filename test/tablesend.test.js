@@ -19,7 +19,7 @@ function loadRouter(oscNo) {
     outlet: (o, ...a) => out.push(a[0] === "frame" ? ["gw", ...a] : [o, ...a]), arrayfromargs: (a) => Array.from(a), messagename: "x",
     Task: class { schedule() {} cancel() {} } };
   const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.osc.js"), "utf8").replace(/^inlets = 1;\noutlets = 3;\n/m, "");
-  const r = new Function(...Object.keys(g), src + "\nreturn { table, sendall, arm, quiet };")(...Object.values(g));
+  const r = new Function(...Object.keys(g), src + "\nreturn { table, baseline, sendall, arm, quiet };")(...Object.values(g));
   return { r, out };
 }
 // DP frames on the bus as [addr, mask, shift, value]
@@ -81,11 +81,22 @@ test("SidStation layout: every table panel expanded fits, nothing overlaps", () 
   }
 });
 
+test("the router: a table moved in from an older set is only the baseline, even when armed; Push patch sends it", () => {
+  const { r, out } = loadRouter(1);
+  r.table(0xff); r.arm(); out.length = 0;                       // loaded and armed
+  r.baseline(0x10, 0xc0, 0x20, 0xc0, 0xfe, 0x00);
+  assert.deepEqual(dps(out), [], "nothing sent");
+  r.table(0x10, 0xc0, 0x20, 0xc0, 0xfe, 0x00); assert.deepEqual(dps(out), [], "the same table again: nothing changed");
+  r.sendall(); assert.ok(dps(out).some(([a, m, sh, v]) => a === 250 && sh === 0 && v === 0x0e), "Push patch sends it (row 2: FE)");
+});
+
 test("the router refuses a Loop to itself or forward (FE FF read past the table, a self-loop hangs the synth)", () => {
   const { r, out } = loadRouter(1);
   r.table(0x10, 0xc0, 0xff); r.arm(); out.length = 0;
   r.table(0x10, 0xc0, 0x10, 0xc0, 0xfe, 0xff);                  // Loop at step 2 to step 255
   r.table(0x10, 0xc0, 0x10, 0xc0, 0xfe, 0x02);                  // Loop at step 2 to itself
+  r.table(0x10, 0xc0, 0x10, 0xc0, 0x1fe, 0x02);                 // not a byte (would read as FE: a Loop to itself)
+  r.table(0x10, 0xc0, 16.5, 0xc0, 0xff);                          // not an integer
   assert.deepEqual(dps(out), [], "nothing sent");
   r.sendall(); assert.ok(!dps(out).some(([a, m, sh, v]) => a === 251 && v === 15), "sendall keeps the last valid table");
   out.length = 0;

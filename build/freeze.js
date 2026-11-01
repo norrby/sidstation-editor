@@ -48,6 +48,9 @@ const dlst = field("dlst", Buffer.concat(dire));
 const mx = Buffer.concat([Buffer.from("mx@c"), be(16), be(0), be(offset), ...entries.map((e) => e.data), dlst]);
 const frozen = Buffer.concat([Buffer.from("ampf"), le(4), Buffer.from("mmmm"), Buffer.from("meta"), le(4), le(7), Buffer.from("ptch"), le(mx.length), mx]);
 
+// No path from the machine that built it goes out in a release.
+const leak = /\/Users\//i.exec(frozen.toString("latin1"));
+if (leak) throw new Error("the frozen device contains \"" + leak[0] + "\"; not written");
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, frozen);
 console.log("wrote " + path.relative(ROOT, out) + ": " + entries.length + " files, " + frozen.length + " bytes");

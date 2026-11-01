@@ -35,6 +35,7 @@ function finish(frame) {
   sidlog("capture", "dump " + frame.length + " bytes: " + frame.map(hex).join(" "));
   report(frame, info);
   if (frame[6] === ID_DUMP || frame[6] === ID_SKIP) outlet(0, "replied", "dump");   // ends the gateway's wait after a 05 request
+  if (info.badNibble) { sidlog("capture", "ERROR dump with a data byte above 0F where a nibble belongs: not passed on"); return; }
   if (info.patch) { sidlog("capture", "patch '" + info.name + "' -> the editor, " + info.patch.length + " raw bytes"); outlet(0, "patch", ...info.patch); }
 }
 

@@ -192,8 +192,11 @@ test("push: the first value per knob (the restore on load) is kept, not applied;
   assert.equal(last(out), "bytes 16 60 130 133 255");                      // 82 = Noise + sync, 85 = subtract 5
   assert.equal(knob(out, "pitch"), "knob pitch 2");                          // the pitch knob followed the offset
   assert.deepEqual(out.filter((s) => s.startsWith("bank ")), ["bank 1"], "the slot after Pitch: Note as built (not sent: every bank edit is an undo step in Live), Offset once the step is relative");
-  w.push("note", 48); assert.deepEqual([w.steps[1].mode, w.steps[1].fixed], ["F", 48]); assert.equal(last(out), "bytes 16 60 130 48 255");
+  w.push("note", 50); assert.deepEqual([w.steps[1].mode, w.steps[1].fixed], ["F", 50]); assert.equal(last(out), "bytes 16 60 130 50 255");
   w.push("pitch", 0); assert.equal(last(out), "bytes 16 60 130 255 255");
+  const before = tables();
+  w.push("note", 50); w.push("offset", -5);                                 // the step's own values (the last redo of a knob the editor wrote)
+  assert.equal(tables(), before, "not an edit: the step stays without a pitch change");
 });
 
 test("a new device writes no knob and no bank (each is an undo step in Live), and an undo of a knob beyond the table is not written back", () => {
@@ -205,16 +208,19 @@ test("a new device writes no knob and no bank (each is an undo step in Live), an
   assert.deepEqual(out.filter((s) => /^(knob|bank)/.test(s)), []);
 });
 
-test("the Step parameters are the table: a restore (load, undo, redo, a program) is shown and sent, never written back; an edit writes only the cells it changes", () => {
+test("the Step parameters are the table: a restore is shown, never written back, and sent unless it is the load; an edit writes only the cells it changes", () => {
   const { w, out } = loadWidget();
   restore(w);
-  w.cell(0, 0x103c); w.cell(1, 0x20ff); w.cell(2, 0xff00);                  // Live restores the cells (or an undo, or a program writes them)
+  w.cell(0, 0x103c); w.cell(1, 0x20ff); w.cell(2, 0xff00);                  // Live restores the cells on load: each one's first value
   assert.equal(w.n, 2);
   assert.deepEqual(out.filter((s) => /^(cell|knob)/.test(s)), [], "a restore writes no cell and no knob (each write is an undo step)");
-  assert.equal(last(out), "bytes 16 60 32 255 255", "the restored table still goes to the synth's router");
+  assert.equal(out.filter((s) => /^(bytes|baseline)/.test(s)).pop(), "baseline 16 60 32 255 255", "the set's table is the router's baseline: loading sends nothing");
+  w.cell(1, 0x30ff);                                                        // later (an undo, a redo, a program): sent
+  assert.equal(last(out), "bytes 16 60 48 255 255");
+  w.cell(1, 0x20ff);
   out.length = 0;
-  w.push("len", 3);                                                         // cell 2 becomes a step, cell 3 the End
-  assert.deepEqual(out.filter((s) => /^cell/.test(s)), ["cell 2 4351", "cell 3 65280"]);
+  w.push("len", 3);                                                         // cell 2 becomes a step, cell 3 the End (written first: undo keeps an end)
+  assert.deepEqual(out.filter((s) => /^cell/.test(s)), ["cell 3 65280", "cell 2 4351"]);
   out.length = 0;
   w.push("len", 3);
   assert.deepEqual(out.filter((s) => /^cell/.test(s)), [], "the same table again: nothing written");
@@ -222,13 +228,15 @@ test("the Step parameters are the table: a restore (load, undo, redo, a program)
   assert.deepEqual(out.filter((s) => /^cell/.test(s)), ["cell 1 65280"]);
   w.cell(1, 0x20ff);                                                        // an undo puts step 1 back: the table is 3 long again (End in 3)
   assert.equal(w.n, 3);
+  assert.match(last(out), /^bytes /);
 });
 
 test("a table from an older editor (the blob, format 1) moves into the Step parameters once; a new device writes nothing", () => {
   const { w, out, notified } = loadWidget();
   w.setvalueof(1, 2, 0x10, 0x3c, 0x20, 0xff, 0xff);
-  w.migrate();
-  assert.deepEqual(out.filter((s) => /^cell/.test(s)), ["cell 0 4156", "cell 1 8447", "cell 2 65280"]);
+  out.length = 0; w.migrate();
+  assert.deepEqual(out.filter((s) => /^cell/.test(s)), ["cell 2 65280", "cell 0 4156", "cell 1 8447"]);
+  assert.deepEqual(out.filter((s) => /^(bytes|baseline)/.test(s)), ["baseline 16 60 32 255 255"], "to the router as the baseline: loading sends nothing");
   assert.equal(notified.length, 1); assert.deepEqual(w.getvalueof(), [2]);
   const b = loadWidget();
   b.w.migrate();

@@ -6,7 +6,7 @@ are collected at the end.
 ## 1. The big picture
 
 Six things take part: the **SidStation**, a **MIDI interface**, and, on **one MIDI track in Ableton Live**, the
-track's **input**, the track's **clips**, this **editor** device and Live's own **External Instrument** device.
+track's **input**, the track's **clips**, this **editor** device and the track's **output**.
 
 - **The track's input** (*MIDI From* in Live) hears the MIDI interface: the synth's replies, and also your keyboard.
 - **The track's clips** are not part of the input, but Live merges what they play with the input before it reaches
@@ -14,8 +14,9 @@ track's **input**, the track's **clips**, this **editor** device and Live's own 
 - **The editor** is a Max for Live device. On screen it has **controls**: dials, buttons, menus and drawn editors
   such as the envelope, one for every value in a SidStation patch (section 4 shows how they are made). The editor
   turns a change of a control into MIDI messages, and sets the controls from what the synth sends back.
-- **External Instrument** comes after the editor on the same track. It sends the editor's output to the MIDI
-  interface (*MIDI To*).
+- **The track's output** (*MIDI To* in Live) sends what the editor outputs to the MIDI interface, on the channel
+  set there. (To hear the synth's audio in Live, Live's External Instrument can come after the editor; the MIDI then
+  goes out through its *MIDI To* instead.)
 - **The MIDI interface** is wired both ways: its output to the synth's MIDI In, the synth's MIDI Out to its input.
 
 So one track both sends to the synth and hears what the synth sends back, and no second track is needed for the
@@ -25,7 +26,7 @@ replies.
 flowchart LR
   kb["keyboard"] --> in
   clips["the track's clips"] --> ed
-  in["track input<br/>(MIDI From)"] --> ed["SidStation Editor<br/>(this device)"] --> ei["External Instrument<br/>(Live's device)"]
+  in["track input<br/>(MIDI From)"] --> ed["SidStation Editor<br/>(this device)"] --> ei["track output<br/>(MIDI To)"]
   ei -- "MIDI interface" --> sid["SidStation"]
   sid -- "MIDI interface" --> in
   classDef live stroke-width:3px
@@ -36,7 +37,7 @@ The boxes with a thick border are on the same Live track.
 
 ## 2. The device's four jobs
 
-Between the track's input and External Instrument, the device does four jobs: **Translate**, **Guard**, **Listen**
+Between what comes into the track and what goes out of it, the device does four jobs: **Translate**, **Guard**, **Listen**
 and **Forward**.
 
 - **Translate:** when a control on screen changes, a *router* script turns it into a MIDI message.
@@ -58,7 +59,7 @@ flowchart LR
   listen --> ui
   notes --> guard["Guard<br/>the only way out"]
   tell --> guard
-  guard --> out["to External Instrument"]
+  guard --> out["to the track's MIDI To"]
 ```
 
 ## 3. The four jobs as scripts
@@ -95,7 +96,7 @@ flowchart LR
   end
   ctrls["controls<br/>(live.* + widgets)"]
   gate["sid.send.js<br/>gateway"]
-  midiout(["[midiout]<br/>→ External Instrument"])
+  midiout(["[midiout]<br/>→ the track's MIDI To"])
 
   midiin --> cap
   midiin -- "notes, no SysEx" --> osc

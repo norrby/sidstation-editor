@@ -8,6 +8,7 @@
 //      table <n> <0|1>    show/hide the waveform table panel for osc n (collapsed by default)
 //      tblspeed <n> <v>   Table Speed of osc n (0 = table off: its row dashed, the label dimmed; above 0: the note after "Oscillator n")
 //      fold <n> <0|1>     like show, inverted
+//      gate <n> <0|1>     Gate on osc n: the A/D/R dials are dimmed and take no clicks (the dials themselves stay active)
 //      lfosel <0..3>      the LFO selector (live.tab "LFO Select"): only that LFO's sub-panel shows
 //      lfoshow <0|1>      the LFO section's fold button: 0 = only the column
 //      bang               send the whole layout (on load)
@@ -47,10 +48,11 @@ function tblspeed(n, v) { const s = state["o" + n]; if (!s) return; s.tbloff = N
 function poly(v) { const s = state.o1; if (!s) return; s.poly = v ? 1 : 0; s.single = 1 - s.poly; sidlog("layout", "poly", s.poly); relayout(false); }
 // glide <v>: some oscillator has Portamento > 0; without it Legato does nothing and its greyed stand-in is shown (c_legatodim)
 function glide(v) { const s = state.o1; if (!s) return; s.glide = v ? 1 : 0; s.noglide = 1 - s.glide; sidlog("layout", "glide", s.glide); relayout(false); }
+function gate(n, v) { const s = state["o" + n]; if (!s) return; s.gate = v ? 1 : 0; relayout(false); }
 function show(n, v) { const s = state[key(n)]; if (!s) return; s.show = v ? 1 : 0; sidlog("layout", "show", n, s.show); relayout(false); }
 function lfosel(i) { selectLfo(state, (i | 0) + 1); sidlog("layout", "lfo", (i | 0) + 1); relayout(false); }
 function lfoshow(v) { for (let n = 1; n <= 4; n++) if (state["l" + n]) state["l" + n].fold = v ? 0 : 1; sidlog("layout", "lfoshow", v ? 1 : 0); relayout(false); }
 function bang() { relayout(true); sidlog("layout", devname, "laid out, width", compute(layout, state).width); }
 
-wave = sidguard("layout", wave); pwlfo = sidguard("layout", pwlfo); fold = sidguard("layout", fold); show = sidguard("layout", show); env = sidguard("layout", env); table = sidguard("layout", table); bang = sidguard("layout", bang); lfosel = sidguard("layout", lfosel); lfoshow = sidguard("layout", lfoshow); tblspeed = sidguard("layout", tblspeed); poly = sidguard("layout", poly); glide = sidguard("layout", glide);
+wave = sidguard("layout", wave); pwlfo = sidguard("layout", pwlfo); fold = sidguard("layout", fold); show = sidguard("layout", show); env = sidguard("layout", env); table = sidguard("layout", table); bang = sidguard("layout", bang); lfosel = sidguard("layout", lfosel); lfoshow = sidguard("layout", lfoshow); tblspeed = sidguard("layout", tblspeed); poly = sidguard("layout", poly); gate = sidguard("layout", gate); glide = sidguard("layout", glide);
 sidlog("layout", "loaded", devname, layout ? "" : "(unknown layout)");

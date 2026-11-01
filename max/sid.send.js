@@ -1,5 +1,6 @@
 // sid.send.js – the gateway: the ONLY path to the synth ("synth mutex"), built into SidStation. v8, Max 9.
-// Built together with lib/maxlog.js + lib/sysex.js + lib/params.js by build/build-station.js (dist/sid.send.js).
+// Built together with lib/maxlog.js + lib/sysex.js + lib/params.js by build/build-station.js (dist/sid.send.js), which also sets
+// SID_DEV (true in a development build, false in a release: the per-message "bus:" lines and the per-second count are logged only then).
 //
 // SAFETY: the SidStation's OS lives in PROM and can be destroyed by wrong SysEx
 // (a chip has had to be reprogrammed before). Three rules apply here:
@@ -9,8 +10,12 @@
 //     channel messages with the right length and 7-bit data, and the dump request (id 05,
 //     validateRequestFrame: exactly 9 bytes, slot 0..99 or 7F; only for a firmware with
 //     dump-request support); with that firmware also the settings request (06, validateSettingsFrame) and store (07 7F, validateStoreFrame).
-//  2. One message at a time, never interleaved: everything goes into ONE queue emptied by a
-//     Task, one whole message per tick, with a pause suited to the type. The routers send "frame <bytes…>" here on an
+//  2. One message at a time, never interleaved, in arrival order: everything goes into ONE queue. Channel messages and DP
+//     frames go out at once; only a patch frame (150 ms for the synth to store it) and a request (10 ms) are followed by a
+//     pause, during which later messages wait in the queue. Nothing is paced to the MIDI cable: what the cable cannot carry
+//     waits in Live's / the system's MIDI buffer (decided 2026-11-01: no queue handling of our own beyond this).
+//     While a dump request (05) waits for its dump, the queue is held like during a store: the synth stops reading its
+//     256-byte channel-message buffer while it dumps (0.3–0.5 s), and more bytes would overwrite unread ones (wrong CC values). The routers send "frame <bytes…>" here on an
 //     outlet of their own (no global bus, so nothing else in the set can send through it twice).
 //  3. Store: from sending 07 until its 47 reply (from the capture: "stored") or a timeout NOTHING else goes to
 //     the synth. The store compacts the patch memory for up to ~0.3 s; a patch frame (02/01) in that window corrupts the
@@ -44,9 +49,9 @@ function enqueue(m) {
   if (!task) { task = new Task(drain); drain(); }
 }
 
-function pace(m) {
-  if (m[0] !== 0xf0) return 1;                               // channel message
-  if (m[6] === ID_DP || m[6] === ID_REQUEST || m[6] === ID_SETTINGS || m[6] === ID_STORE) return 10;   // DP/requests: short pause
+function pace(m) {                                           // the pause after a message, 0 = none
+  if (m[0] !== 0xf0 || m[6] === ID_DP) return 0;             // channel message, DP: the next one at once
+  if (m[6] === ID_REQUEST || m[6] === ID_SETTINGS || m[6] === ID_STORE) return 10;   // DP/requests: short pause
   return Math.round(m.length * 0.32) + GAP_MS;                // patch frame: wire time + storing
 }
 
@@ -58,23 +63,48 @@ function drain() {
 }
 function drainOne() {
   if (!task) return;
-  if (storing) { task.schedule(10); return; }                // store lock: nothing to the synth until the reply
-  if (!queue.length) { task = null; return; }
-  const m = queue.shift();
-  if (m[0] === 0xf0) {                                       // last check right before sending
-    const v = validate(m);
-    if (!v.ok) { queue = []; task = null; status("STOP: frame failed validation while sending (" + v.reason + ")"); return; }
+  if (storing || waiting.dump) { task.schedule(10); return; }   // store lock, dump pending: nothing to the synth until the reply
+  while (queue.length) {
+    const m = queue.shift();
+    if (m[0] === 0xf0) {                                     // last check right before sending
+      const v = validate(m);
+      if (!v.ok) { queue = []; task = null; status("STOP: frame failed validation while sending (" + v.reason + ")"); return; }
+    }
+    for (const b of m) outlet(0, b);
+    if (SID_DEV) tally(m);
+    if (m[0] === 0xf0 && m[6] === ID_STORE) lockStore();
+    if (m[0] === 0xf0 && m[6] === ID_REQUEST) expectReply("dump");
+    if (m[0] === 0xf0 && m[6] === ID_SETTINGS) expectReply("settings");
+    const ms = pace(m);
+    if (ms) { task.schedule(ms); return; }
+    if (storing || waiting.dump) { task.schedule(10); return; }
   }
-  for (const b of m) outlet(0, b);
-  if (m[0] === 0xf0 && m[6] === ID_STORE) lockStore();
-  if (m[0] === 0xf0 && m[6] === ID_REQUEST) expectReply("dump");
-  if (m[0] === 0xf0 && m[6] === ID_SETTINGS) expectReply("settings");
-  task.schedule(pace(m));
+  task = null;
 }
 
+// Development builds only (SID_DEV): what leaves for the synth, counted per kind and logged once a second while anything goes
+// out (the "bus:" lines are logged when a message arrives, not when it is sent).
+const sent = {}; let sentTask = null;
+function tally(m) {
+  const k = m[0] !== 0xf0 ? ((m[0] & 0xf0) === 0xb0 ? "CC" : TYPE[m[0] & 0xf0] || "channel")
+    : m[6] === ID_DP ? "DP" : m[6] === ID_REQUEST ? "dump request" : m[6] === ID_SETTINGS ? "settings request" : m[6] === ID_STORE ? "store" : "patch frame";
+  sent[k] = (sent[k] || 0) + 1;
+  if (!sentTask) {
+    sentTask = new Task(() => { sentTask = null; sidlog("send", "sent last second: " + Object.keys(sent).map((k) => sent[k] + " " + k).join(", ") + ", " + queue.length + " queued"); for (const k of Object.keys(sent)) delete sent[k]; });
+    sentTask.schedule(1000);
+  }
+}
+
+// The same checks on entering the queue (accept) and right before sending (drainOne): 01 and DP rows outside the whitelist never go out.
 function validate(m) {
   switch (m[6]) {
-    case ID_DP: return validateDPFrame(m);
+    case ID_CLEAR: return { ok: false, reason: "01 clears every patch on the synth and is never sent" };
+    case ID_DP: {
+      const v = validateDPFrame(m);
+      if (!v.ok) return v;
+      const row = ((m[7] << 7) | m[8]) + ":" + m[9] + ":" + m[10];
+      return DP_ROWS.has(row) ? v : { ok: false, reason: "DP row " + row + " not in whitelist" };
+    }
     case ID_REQUEST: return validateRequestFrame(m);
     case ID_SETTINGS: return validateSettingsFrame(m);
     case ID_STORE: return validateStoreFrame(m);
@@ -126,17 +156,9 @@ function accept(m, what) {
   if (m[0] === 0xf0) {
     if (m[m.length - 1] !== 0xf7 || m.slice(1, -1).some((b) => b > 0x7f)) return refuse(what, "malformed SysEx");
     if (!hasSidHeader(m)) return refuse(what, "not a SidStation frame");
-    if (m[6] === ID_CLEAR) return refuse(what, "01 clears every patch on the synth and is never sent");
-    if (m[6] === ID_DP) {
-      const v = validateDPFrame(m);
-      if (!v.ok) return refuse(what, v.reason);
-      const row = ((m[7] << 7) | m[8]) + ":" + m[9] + ":" + m[10];
-      if (!DP_ROWS.has(row)) return refuse(what, "DP row " + row + " not in whitelist");
-    } else {
-      const v = validate(m);
-      if (!v.ok) return refuse(what, v.reason);
-      if (m[6] === ID_STORE && (storing || queue.some((q) => q[0] === 0xf0 && q[6] === ID_STORE))) return refuse(what, "a store is already pending");
-    }
+    const v = validate(m);
+    if (!v.ok) return refuse(what, v.reason);
+    if (m[6] === ID_STORE && (storing || queue.some((q) => q[0] === 0xf0 && q[6] === ID_STORE))) return refuse(what, "a store is already pending");
   } else {
     const len = CH_LEN[m[0] >> 4];
     if (!len || m.length !== len || m.slice(1).some((b) => b > 0x7f)) return refuse(what, "bad channel message");
@@ -179,7 +201,7 @@ function msg_int(b) { midiIn(b); }                                   // a declar
 function frame() {
   const m = arrayfromargs(arguments).map(Number);
   if (!accept(m, "bus")) return;
-  status("bus: " + (m[0] === 0xf0 ? "DP " + m.slice(7, 12).map((b) => b.toString(16)).join(" ") : m.map((b) => b.toString(16)).join(" ")));
+  if (SID_DEV) status("bus: " + (m[0] === 0xf0 ? "DP " + m.slice(7, 12).map((b) => b.toString(16)).join(" ") : m.map((b) => b.toString(16)).join(" ")));
   outlet(1, "sent");                                                 // a control was used: the name display closes an open field
 }
 

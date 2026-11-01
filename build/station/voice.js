@@ -22,8 +22,10 @@ const PUSH_TABLE = [
   { key: "wave", name: "Wave", cls: "live.menu", vo: { parameter_type: 2, parameter_enum: ["Tri", "Saw", "Pulse", "Mix", "Noise", "Off", "Keep"], parameter_mmax: 6 } },   // "Keep" = the panel's "---": Max replaces "---" with the instance number
   { key: "mod", name: "Mod", cls: "live.menu", vo: { parameter_type: 2, parameter_enum: ["None", "Sync", "Ring", "S+R"], parameter_mmax: 3 } },   // as the widget's mod button
   { key: "pitch", name: "Pitch", cls: "live.menu", vo: { parameter_type: 2, parameter_enum: ["Keep", "Fixed", "Relative"], parameter_mmax: 2 } },
-  // the fixed note as a list of names (Push shows no note names for a unit style): index = the synth's F n, which sounds as MIDI n + 12
-  { key: "note", name: "Note", cls: "live.menu", vo: { parameter_type: 2, parameter_enum: Array.from({ length: 82 }, (_, i) => P.noteName(i + 12)), parameter_mmax: 81 } },
+  // the fixed note as a list of names (Push shows no note names for a unit style): index = the synth's F n, which sounds as MIDI n + 12.
+  // Starts at a new step's note (sid.table.js newStep, F 48), so it does not jump from the lowest name when Length makes the first step.
+  { key: "note", name: "Note", cls: "live.menu", vo: { parameter_type: 2, parameter_enum: Array.from({ length: 82 }, (_, i) => P.noteName(i + 12)), parameter_mmax: 81,
+    parameter_initial_enable: 1, parameter_initial: [48] } },
   { key: "offset", name: "Offset", cls: "live.numbox", vo: { parameter_type: 1, parameter_mmin: -47, parameter_mmax: 47, parameter_unitstyle: UNIT.semitones } },
   { key: "len", name: "Length", cls: "live.numbox", vo: { parameter_type: 1, parameter_mmin: 0, parameter_mmax: 65, parameter_unitstyle: UNIT.int } },
   { key: "loop", name: "Loop", cls: "live.menu", vo: { parameter_type: 2, parameter_enum: ["Once", "Loop"], parameter_mmax: 1 } },
@@ -106,8 +108,13 @@ function tableItems(pre, n) {
     { name: pre + "tableoff", rect: TABLE_OFF, of: "o" + n, when: "tbloff" }, { name: pre + "tableloop", rect: TABLE_LOOP }, { name: pre + "tableclear", rect: TABLE_CLEAR },
     { name: pre + "tablespeed", rect: rectOf("tablespeed") }];
 }
-function envItems(pre) {
-  return [{ name: pre + "envframe", rect: ENV_FRAME }, { name: pre + "envtitle", rect: ENV_TITLE }, { name: pre + "envsection", rect: ENV_SECTION }, { name: pre + "adsr", rect: ADSR_RECT }, { name: pre + "gate", rect: rectOf("gate") },
+// Gate on: a dimmer in front of the A, D and R dials and their labels – they look unused, like the other greyed controls, but can still
+// be turned (the dimmer lets clicks through) and stay active, so automation and Push still reach the synth (a live.dial with active 0
+// holds those values back until it is enabled again).
+const GATE_DIMMED = ["attack", "decay", "release"];
+const gateDimRect = (k) => { const r = rectOf(k); return [r[0], r[1] - 3, r[2], r[3] + 3]; };
+function envItems(pre, n) {
+  return [...GATE_DIMMED.map((k) => ({ name: pre + k + "dim", rect: gateDimRect(k), of: "o" + n, when: "gate" })), { name: pre + "envframe", rect: ENV_FRAME }, { name: pre + "envtitle", rect: ENV_TITLE }, { name: pre + "envsection", rect: ENV_SECTION }, { name: pre + "adsr", rect: ADSR_RECT }, { name: pre + "gate", rect: rectOf("gate") },
     ...["attack", "decay", "sustain", "release"].map((k) => ({ name: pre + k, rect: rectOf(k) }))];
 }
 
@@ -140,15 +147,17 @@ function oscPanel(n, cx0, ctx) {
   const vTblNote = id(), vTblNotePre = id();
   boxes.push(v8ui(vTblNote, "sid.tablenote.js", [1200, py + 460, 124, 14], px(TBL_NOTE), pre + "tblnote"), A.obj(vTblNotePre, "prepend hilite 2", [1200, py + 490, 100, 20]));
   lines.push(A.line(vTblNote, 0, vTblNotePre, 0), A.line(vTblNotePre, 0, vBg, 0));
-  // the waveform table: widget -> [route bytes] -> [prepend table] -> the router (changed rows as DP); sid.load.js sends "bytes …" to it
-  const vTable = id(), vTableRoute = id(), vTablePre = id();
+  // the waveform table: widget -> [route bytes baseline] -> [prepend table] -> the router (changed rows as DP); sid.load.js sends "bytes …" to it.
+  // "baseline …" (the table a set brought, on load) -> [prepend baseline]: the router takes it as what the synth has, sends nothing.
+  const vTable = id(), vTableRoute = id(), vTablePre = id(), vBasePre = id();
   boxes.push(titleBox(id(), pre + "tabletitle", "Table " + n, pt(TABLE_TITLE)), A.comment(id(), "OFF", [1000, py + 210, 44, 15], pt(TABLE_OFF), { varname: pre + "tableoff", fontsize: 10, fontface: 1, textjustification: 1 }),
     // The table is a hidden blob parameter (getvalueof/setvalueof in sid.table.js): Live keeps it in the set and in presets and
     // restores it when the device reloads (otherwise the tables vanished from the editor on every reload).
     { box: { ...v8ui(vTable, "sid.table.js", [1000, py, TABLE_WIDGET_W, 146], pt(TABLE_WIDGET), pre + "table").box, parameter_enable: 1,
       saved_attribute_attributes: { valueof: { parameter_longname: longPre + "Table Data", parameter_shortname: "Table", parameter_type: 3, parameter_invisible: 1, parameter_modmode: 0 } } } },
-    A.obj(vTableRoute, "route bytes", [1000, py + 160, 70, 20], 2, ["", ""]), A.obj(vTablePre, "prepend table", [1000, py + 185, 90, 20]));
-  lines.push(A.line(vTable, 0, vTableRoute, 0), A.line(vTableRoute, 0, vTablePre, 0), A.line(vTablePre, 0, vV8, 0));
+    A.obj(vTableRoute, "route bytes baseline", [1000, py + 160, 90, 20], 3, ["", "", ""]), A.obj(vTablePre, "prepend table", [1000, py + 185, 90, 20]),
+    A.obj(vBasePre, "prepend baseline", [900, py + 185, 90, 20]));
+  lines.push(A.line(vTable, 0, vTableRoute, 0), A.line(vTableRoute, 0, vTablePre, 0), A.line(vTablePre, 0, vV8, 0), A.line(vTableRoute, 1, vBasePre, 0), A.line(vBasePre, 0, vV8, 0));
   // The table itself: one Live parameter per cell of the synth's table, "Osc n Step 00" .. "Osc n Step 64", value DATA1 * 256 + DATA2
   // (sid.table.js). Stored and seen by Live's API, so a program can read the table; not automated and in no bank (invisible 3).
   // The parameter -> [prepend cell i] -> the widget; the widget's "cell i v" -> [route cell] -> [route 0 … 64] -> the parameter (a
@@ -215,7 +224,7 @@ function oscPanel(n, cx0, ctx) {
   lines.push(A.line(vLoad, 0, cfgA, 0), A.line(cfgA, 0, vAdsr, 0), A.line(vLoad, 0, cfgP, 0), A.line(cfgP, 0, vPulse, 0));
 
   // one live.* parameter per row in params.js
-  let x = 30, waveId = null, vGateAct = null; const ids = {};
+  let x = 30, waveId = null; const ids = {};
   for (const d of P.OSC) {
     if (!PRES[d.key]) continue;                      // track: its own controls below
     const [cls] = PRES[d.key];
@@ -245,11 +254,11 @@ function oscPanel(n, cx0, ctx) {
       boxes.push(A.obj(vP, "prepend pwlfo " + n, [x, py + 380, 100, 20]));
       lines.push(A.line(Lb, 0, vP, 0), A.line(vP, 0, vLayout, 0));
     }
-    if (d.key === "gate") {                                              // Gate (manual p. 24): the graph draws a gate at the sustain level, the A/D/R dials are disabled (active 0)
-      const vG = id(), vAct = id(), vActP = id();
-      boxes.push(A.obj(vG, "prepend set gate", [x, py + 330, 100, 20]), A.obj(vAct, "expr 1-$i1", [x, py + 355, 70, 20]), A.obj(vActP, "prepend active", [x, py + 380, 90, 20]));
-      lines.push(A.line(Lb, 0, vG, 0), A.line(vG, 0, vAdsr, 0), A.line(Lb, 0, vAct, 0), A.line(vAct, 0, vActP, 0));
-      vGateAct = vActP;
+    // Gate (manual p. 24): the graph draws a gate at the sustain level, the layout dims A/D/R (GATE_DIMMED)
+    if (d.key === "gate") {
+      const vG = id(), vGL = id();
+      boxes.push(A.obj(vG, "prepend set gate", [x, py + 330, 100, 20]), A.obj(vGL, "prepend gate " + n, [x, py + 355, 90, 20]));
+      lines.push(A.line(Lb, 0, vG, 0), A.line(vG, 0, vAdsr, 0), A.line(Lb, 0, vGL, 0), A.line(vGL, 0, vLayout, 0));
     }
     const link = { attack: [vAdsr, "attack", 0], decay: [vAdsr, "decay", 1], sustain: [vAdsr, "sustain", 2], release: [vAdsr, "release", 3],
       pwstart: [vPulse, "start", 0], pwadd: [vPulse, "add", null] }[d.key];
@@ -263,7 +272,6 @@ function oscPanel(n, cx0, ctx) {
     x += 70;
   }
   lines.push(A.line(vAdsr, 0, vRouteA, 0), A.line(vPulse, 0, vRouteP, 0));
-  if (vGateAct) for (const k of ["attack", "decay", "release"]) lines.push(A.line(vGateAct, 0, ids[k], 0));   // gate on -> A/D/R disabled
   // In Poly, osc 1's Active is replaced by a stand-in that always shows Active (Poly plays osc 1 and ignores Active); the real
   // button keeps its value for Single; the help text says deactivating it has no effect. sid.litbtn.js draws itself lit: a
   // live.text without a parameter showed off in Live.
@@ -314,6 +322,7 @@ function oscPanel(n, cx0, ctx) {
     titleBox(id(), pre + "envlabel", "env", pc(ENV_LABEL)),
     titleBox(id(), pre + "tbllabel", "tbl", pc(TBL_LABEL)),
     { box: { ...frameBox(id(), pre + "tbldimframe", pc(TBL_LABEL), SHADE.dim, 0).box, ignoreclick: 1 } },   // dims "tbl" while Speed is 0 (in front of the label)
+    ...GATE_DIMMED.map((k) => ({ box: { ...frameBox(id(), pre + k + "dim", pe(gateDimRect(k)), SHADE.dim, 0).box, ignoreclick: 1 } })),   // Gate on: dims A/D/R, clicks pass
     // a new SidStation device starts with every panel folded
     live(vTblShow, "live.text", [1300, py + 60, 60, 18], null,
       { parameter_longname: longPre + "Table", parameter_shortname: "Table", parameter_type: 2, parameter_enum: ["hidden", "shown"], parameter_mmax: 1,
@@ -338,7 +347,7 @@ function oscPanel(n, cx0, ctx) {
   }
   lines.push(A.line(waveId, 0, vWavePre, 0), A.line(vWavePre, 0, vLayout, 0));
 
-  return { vV8, activeId: ids.active, activeBtnId, portaId: ids.porta, syncId: ids.sync, ringId: ids.ring, showId: vShow, envShowId: vEnvShow, ringOkId: vRingOk, colItems: colItems(pre, n), cx0, items: oscItems(pre), envItems: envItems(pre), tableItems: tableItems(pre, n), tableId: vTable };
+  return { vV8, activeId: ids.active, activeBtnId, portaId: ids.porta, syncId: ids.sync, ringId: ids.ring, showId: vShow, envShowId: vEnvShow, ringOkId: vRingOk, colItems: colItems(pre, n), cx0, items: oscItems(pre), envItems: envItems(pre, n), tableItems: tableItems(pre, n), tableId: vTable };
 }
 
 module.exports = { OSC_W, ENV_W, TABLE_W, SHIFT, FILTER_BTN, colItems, tableItems, envItems, oscPanel };

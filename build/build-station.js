@@ -157,7 +157,7 @@ function buildDevice(title) {
   {
     // One track, with the same protection as separate devices would give: the gateway and the capture (formerly the SidSend and SidCapture devices) are built in. Everything to the synth – the routers' frames and the
     // track's notes – goes through the gateway (validation, whitelist, one queue, store lock) and out of the device's own
-    // [midiout] (on to External Instrument). The track's input goes to the capture (dumps saved, patches/replies to the loader
+    // [midiout] (on to the track's MIDI To). The track's input goes to the capture (dumps saved, patches/replies to the loader
     // and the gateway, nothing global) and to the osc 1 router, which passes notes and drops SysEx (the echo rule).
     const vGate = id(), vCap = id(), vStored = id(), vStoredPre = id(), vCapRoute = id(), vRepliedPre = id(), vGateRoute = id(), vNoReplyPre = id(), vAnsweredPre = id(), vSentMsg = id();
     boxes.push(A.obj(vGate, "v8 sid.send.js", [30, 500, 100, 20], 2, ["", ""], { varname: "gateway" }),
@@ -176,12 +176,13 @@ function buildDevice(title) {
   for (const t of ctx.armTargets) lines.push(A.line(vArm, 0, t, 0));
 
   // sendtoback in order: last = furthest back, so outer panels (voice, overview, filter) after the inner ones
-  const panelsVn = boxes.filter((b) => b.box.maxclass === "panel" && !/tbldimframe$/.test(b.box.varname)).map((b) => b.box.varname);   // the dimmers stay in front
+  const panelsVn = boxes.filter((b) => b.box.maxclass === "panel" && !/tbldimframe$|_(attack|decay|release)dim$/.test(b.box.varname)).map((b) => b.box.varname);   // the dimmers stay in front
   const inner = (v) => /oscframe|envframe|^f_frame$|^l\d_frame$|^mapinnerframe$/.test(v);    // sub-panels (also the filter's f_frame and the LFOs' l<n>_frame)
   const bgsVn = boxes.filter((b) => b.box.filename === "sid.voicebg.js").map((b) => b.box.varname);   // the voice backgrounds furthest back
   const backs = panelsVn.filter(inner).concat(panelsVn.filter((v) => !inner(v)), bgsVn);
   renameAll(boxes, panels);                                             // unique short names for Live's API; the dials keep their labels
-  const layout = { panels, backs, fronts: ["name", "tip"] };   // the name display in front of the overview's v8ui (the text field is raised when shown), the tooltip layer in front of that
+  const gateDims = panelsVn.length ? boxes.map((b) => b.box.varname).filter((v) => /_(attack|decay|release)dim$/.test(v || "")) : [];
+  const layout = { panels, backs, fronts: [...gateDims, "name", "tip"] };   // the name display in front of the overview's v8ui (the text field is raised when shown), the tooltip layer in front of that
   const width = L.compute(layout, L.initialState(layout)).width;            // all oscillators visible, LFO 1 selected
   p.openrect = [0, 0, width, 169];
   for (const { box: b } of boxes) {                                      // Live's Info View: a title and a plain-English text (lib/help.js), also
@@ -218,15 +219,15 @@ const LAYOUTS = {};
   console.log("wrote dist/" + DEVICE + ".amxd (" + width + " px)");
 }
 const read = (f) => fs.readFileSync(path.join(__dirname, "..", f), "utf8");
-writeIfChanged(path.join(OUT_DIR, "sid.osc.js"), ["lib/maxlog.js", "lib/sysex.js", "lib/params.js", "lib/midi.js", "max/sid.osc.js"].map(read).join("\n\n"));
+writeIfChanged(path.join(OUT_DIR, "sid.osc.js"), ["lib/maxlog.js", "lib/sysex.js", "lib/params.js", "lib/midi.js", "lib/liveparam.js", "max/sid.osc.js"].map(read).join("\n\n"));
 writeIfChanged(path.join(OUT_DIR, "sid.filter.js"), ["lib/maxlog.js", "lib/sysex.js", "lib/params.js", "max/sid.filter.js"].map(read).join("\n\n"));
 writeIfChanged(path.join(OUT_DIR, "sid.lfo.js"), ["lib/maxlog.js", "lib/sysex.js", "lib/params.js", "max/sid.lfo.js"].map(read).join("\n\n"));
-writeIfChanged(path.join(OUT_DIR, "sid.send.js"), ["lib/maxlog.js", "lib/sysex.js", "lib/params.js", "lib/midi.js", "max/sid.send.js"].map(read).join("\n\n"));     // the gateway
+writeIfChanged(path.join(OUT_DIR, "sid.send.js"), ["const SID_DEV = " + !RELEASE + ";", ...["lib/maxlog.js", "lib/sysex.js", "lib/params.js", "lib/midi.js", "max/sid.send.js"].map(read)].join("\n\n"));     // the gateway
 writeIfChanged(path.join(OUT_DIR, "sid.capture.js"), ["lib/maxlog.js", "lib/sysex.js", "lib/midi.js", "max/sid.capture.js"].map(read).join("\n\n"));   // the capture
 writeIfChanged(path.join(OUT_DIR, "sid.load.js"), ["lib/maxlog.js", "lib/params.js", "max/sid.load.js"].map(read).join("\n\n"));
 writeIfChanged(path.join(OUT_DIR, "sid.version.js"), ["lib/maxlog.js", "max/sid.version.js"].map(read).join("\n\n"));         // the version in the set
 writeIfChanged(path.join(OUT_DIR, "sid.layout.js"), [read("lib/maxlog.js"), read("lib/layout.js"), "const LAYOUTS = " + JSON.stringify(LAYOUTS) + ";\n", read("max/sid.layout.js")].join("\n\n"));
-for (const f of ["sid.adsr.js", "sid.pulse.js", "sid.note.js", "sid.map.js", "sid.fold.js", "sid.section.js", "sid.filtcurve.js", "sid.legend.js", "sid.vslider.js", "sid.name.js", "sid.lfoview.js", "sid.table.js", "sid.voicebg.js", "sid.tablenote.js", "sid.lfotabs.js", "sid.loopbtn.js", "sid.litbtn.js", "sid.activebtn.js", "sid.dimbtn.js", "sid.tip.js"]) writeIfChanged(path.join(OUT_DIR, f), ["lib/maxlog.js", "lib/ui.js", "max/" + f].map(read).join("\n\n").replace("\n\n// sid.name.js", "\n\nconst DEVICE_NAME = " + JSON.stringify(DEVICE) + ";\nconst DEVICE_TITLE = " + JSON.stringify(DEVICE + " " + VERSION) + ";\n\n// sid.name.js"));   // + the shared palette (and the device name for sid.name.js)
+for (const f of ["sid.adsr.js", "sid.pulse.js", "sid.note.js", "sid.map.js", "sid.fold.js", "sid.section.js", "sid.filtcurve.js", "sid.legend.js", "sid.vslider.js", "sid.name.js", "sid.lfoview.js", "sid.table.js", "sid.voicebg.js", "sid.tablenote.js", "sid.lfotabs.js", "sid.loopbtn.js", "sid.litbtn.js", "sid.activebtn.js", "sid.dimbtn.js", "sid.tip.js"]) writeIfChanged(path.join(OUT_DIR, f), ["lib/maxlog.js", "lib/ui.js", ...(f === "sid.map.js" ? ["lib/liveparam.js"] : []), "max/" + f].map(read).join("\n\n").replace("\n\n// sid.name.js", "\n\nconst DEVICE_NAME = " + JSON.stringify(DEVICE) + ";\nconst DEVICE_TITLE = " + JSON.stringify(DEVICE + " " + VERSION) + ";\n\n// sid.name.js"));   // + the shared palette (and the device name for sid.name.js)
 copyIfChanged(path.join(__dirname, "..", "docs", "device-guide.md"), path.join(OUT_DIR, GUIDE));   // next to the device; freeze.js embeds it
 for (const f of fs.readdirSync(path.join(__dirname, "..", "max", "icons"))) copyIfChanged(path.join(__dirname, "..", "max", "icons", f), path.join(OUT_DIR, f));
 console.log("wrote dist/sid.osc.js, sid.layout.js, widgets, icons");
