@@ -71,10 +71,10 @@ function drainOne() {
       if (!v.ok) { queue = []; task = null; status("STOP: frame failed validation while sending (" + v.reason + ")"); return; }
     }
     for (const b of m) outlet(0, b);
-    if (SID_DEV) tally(m);
     if (m[0] === 0xf0 && m[6] === ID_STORE) lockStore();
     if (m[0] === 0xf0 && m[6] === ID_REQUEST) expectReply("dump");
     if (m[0] === 0xf0 && m[6] === ID_SETTINGS) expectReply("settings");
+    if (SID_DEV) tally(m);                                   // after the lock: a throw here must not leave a sent store unlocked
     const ms = pace(m);
     if (ms) { task.schedule(ms); return; }
     if (storing || waiting.dump) { task.schedule(10); return; }

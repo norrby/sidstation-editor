@@ -48,9 +48,11 @@ const dlst = field("dlst", Buffer.concat(dire));
 const mx = Buffer.concat([Buffer.from("mx@c"), be(16), be(0), be(offset), ...entries.map((e) => e.data), dlst]);
 const frozen = Buffer.concat([Buffer.from("ampf"), le(4), Buffer.from("mmmm"), Buffer.from("meta"), le(4), le(7), Buffer.from("ptch"), le(mx.length), mx]);
 
-// No path from the machine that built it goes out in a release.
-const leak = /\/Users\//i.exec(frozen.toString("latin1"));
+// No path or name from the machine that built it goes out in a release, and release/ gets no development build.
+const text = frozen.toString("latin1");
+const leak = /\/Users\/|[A-Z]:\\Users\\\w|norrby|mattias|claude|anthropic|modularmanagement/i.exec(text);
 if (leak) throw new Error("the frozen device contains \"" + leak[0] + "\"; not written");
+if (out.startsWith(path.join(ROOT, "release") + path.sep) && !text.includes("const SID_DEV = false;")) throw new Error("the frozen device is not a release build (run npm run release); not written");
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, frozen);
 console.log("wrote " + path.relative(ROOT, out) + ": " + entries.length + " files, " + frozen.length + " bytes");

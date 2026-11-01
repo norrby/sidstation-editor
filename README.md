@@ -11,12 +11,12 @@ Not affiliated with or endorsed by Elektron. Use at your own risk.
 
 ## Quick start
 
-1. Drag `SidStation-Editor.amxd` onto a MIDI track.
+1. Download `SidStation-Editor.amxd` (see [Install](#install)) and drag it onto a MIDI track.
 2. Set the track's *MIDI To* to the synth's port and channel, and *MIDI From* to *All Ins* (your
    keyboard and the synth's replies).
 3. Make the synth and the editor alike: dump the patch from the synth (System > MIDI > SYSEXDump =
    Patch), or press **Push patch**.
-4. Turn the dials and play. Details in [Install](#install) and [Setup in Live](#setup-in-live) below.
+4. Turn the dials and play. Details in [Setup in Live](#setup-in-live) below.
 
 ## Features
 

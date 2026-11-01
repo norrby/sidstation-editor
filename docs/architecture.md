@@ -73,8 +73,8 @@ Each job is done by one or more scripts in `max/`, and each script runs as a `[v
 | Listen | `sid.capture.js` decodes what comes in, `sid.load.js` sets the controls from a patch |
 | Forward | oscillator 1's router, `sid.osc.js` 1 |
 
-Two of Max's own objects are the device's ends: `[midiin]` receives the track's input and clips, `[midiout]` leads to External
-Instrument.
+Two of Max's own objects are the device's ends: `[midiin]` receives the track's input and clips, `[midiout]` leads to the track's
+MIDI To.
 
 - **Forward in a router:** oscillator 1's router sees the track's input anyway, so it also passes the notes on to the
   gateway. The other routers do not see the input.
@@ -224,20 +224,21 @@ checks the **whitelist**, and puts the message in the **queue**.
 1. **Shape:** bytes 0–255, SysEx starting with F0 and ending with F7, the SidStation header, a valid id.
 2. **Whitelist:** a Direct Program message must write one of the fields listed in `lib/params.js`. The manual warns
    that undocumented addresses can crash the synth and destroy its memory.
-3. **Queue:** one message at a time, with a pause after each: 1 ms after a channel message, 10 ms after Direct
-   Program or a request, and the transfer time plus 150 ms after a patch frame, so the synth can store it.
+3. **Queue:** one message at a time, in arrival order. Channel messages and Direct Program go out at once; only a
+   request is followed by a pause of 10 ms, and a patch frame by its transfer time plus 150 ms, so the synth can store it.
 
 The gateway is in one of three states: **Idle** (nothing queued), **Sending** (working through the queue) or
-**Locked** (waiting for a store result). Notes skip the queue and go out at once, except while it is Locked.
+**Locked** (waiting for a store result, or for the dump a Pull asked for: the synth stops reading what comes in while
+it dumps). Notes skip the queue and go out at once, except while a store is Locked.
 
 ```mermaid
 stateDiagram-v2
   [*] --> Idle
   Idle --> Sending: a message is accepted
-  Sending --> Sending: send one, then pause
+  Sending --> Sending: send one; a pause only after a patch frame or a request
   Sending --> Idle: queue empty
-  Sending --> Locked: sent a store
-  Locked --> Sending: store result, or 3 s
+  Sending --> Locked: sent a store or a dump request
+  Locked --> Sending: store result or dump, or 3 s
 ```
 
 ## 8. The patch as bytes
