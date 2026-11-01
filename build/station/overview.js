@@ -71,13 +71,15 @@ function patchColumn(x0, ctx) {
   lines.push(A.line(vSlot, 0, vSlotPre, 0), A.line(vSlotPre, 0, vFilter, 0));
   // Push: sendall to osc 1–3, the filter/common (including the name) and LFO 1–4 (one button for the whole patch), then "pushed"
   // to the gateway ([t b b]: right outlet first, so every router has queued its frames before the marker): Store patch is allowed
-  // from then until the next change (build-station.js greys the button on the gateway's "storable 0|1").
+  // from then until the next change (build-station.js greys the button on the gateway's "storable 0|1"). The button is a toggle: it
+  // lights when pressed and stays lit until the gateway has sent everything ("pushing 1|0" -> "set"), so a press is seen even while
+  // the device is busy sending (a momentary button never got drawn lit).
   const vBtn = id(), vSel = id(), vSel1 = id(), vMsg = id(), vPushT = id(), vPushed = id();
-  boxes.push(actionButton(vBtn, [3200, 2500, 60, 15], px(SENDALL_RECT), "Push Patch", SENDALL_TEXT, "c_sendall"),
+  boxes.push(actionButton(vBtn, [3200, 2500, 60, 15], px(SENDALL_RECT), "Push Patch", SENDALL_TEXT, "c_sendall", 1),
     A.obj(vSel, "route bang", [3200, 2520, 60, 20]), A.obj(vSel1, "sel 1", [3260, 2520, 40, 20]), A.obj(vPushT, "t b b", [3200, 2545, 40, 20], 2, ["bang", "bang"]),
     A.msg(vMsg, "sendall", [3200, 2570, 50, 20]), A.msg(vPushed, "pushed", [3260, 2570, 50, 20]));
   lines.push(A.line(vBtn, 0, vSel, 0), A.line(vSel, 0, vPushT, 0), A.line(vSel, 1, vSel1, 0), A.line(vSel1, 0, vPushT, 0), A.line(vPushT, 1, vMsg, 0), A.line(vPushT, 0, vPushed, 0));
-  ctx.sendAllId = vMsg; ctx.pushedId = vPushed; ctx.pushId = vPushT;
+  ctx.sendAllId = vMsg; ctx.pushedId = vPushed; ctx.pushId = vPushT; ctx.pushBtnId = vBtn;
   items.push({ name: "c_sendall", rect: SENDALL_RECT });
   // Pull: dump request (05 7F, needs a firmware with dump-request support) via the filter router; the reply comes in through the capture and is loaded into the panels
   const vFetch = id(), vFetchSel = id(), vFetchSel1 = id(), vFetchMsg = id();
@@ -149,7 +151,7 @@ function mapPanel(x0, oscs, oscNos, filterShowId, filterEnvId, ctx) {
     const vN = id(), vSet = id(), vTx = id();
     boxes.push(live(vN, "live.numbox", [1100 + i * 50, 700, 40, 18], null,
       { parameter_longname: "Name " + i, parameter_shortname: "N" + i, parameter_type: 1, parameter_mmin: 0, parameter_mmax: 127, parameter_unitstyle: 0,
-        parameter_modmode: 0, parameter_initial_enable: 1, parameter_initial: [32] }, {}, "n_char" + i),
+        parameter_modmode: 0, parameter_initial_enable: 1, parameter_initial: [P.NAME_INIT.charCodeAt(i - 1)] }, {}, "n_char" + i),
       A.obj(vSet, "prepend set char " + i, [1100 + i * 50, 730, 110, 20]));
     lines.push(A.line(vNameIdx, i - 1, vN, 0), A.line(vN, 0, vSet, 0), A.line(vSet, 0, vName, 0));
     if (vV8) { boxes.push(A.obj(vTx, "prepend namechar " + i, [1100 + i * 50, 760, 110, 20])); lines.push(A.line(vN, 0, vTx, 0), A.line(vTx, 0, vV8, 0)); }
@@ -190,7 +192,7 @@ function mapPanel(x0, oscs, oscNos, filterShowId, filterEnvId, ctx) {
     const vT = id(), vPre = id();
     boxes.push(live(vT, "live.text", [1500 + n * 70, 320, 60, 18], shifted(FILTER_BTN, oscs[n].cx0, 0),
       { parameter_longname: "Osc " + n + " Filter", parameter_shortname: "Flt" + n, parameter_type: 2, parameter_enum: ["out", "filter"], parameter_mmax: 1,
-        parameter_modmode: 0, parameter_initial_enable: 1, parameter_initial: [1] }, { text: "Filter", texton: "Filter", mode: 1, fontsize: 9 }, "f_route" + n),
+        parameter_modmode: 0, parameter_initial_enable: 1, parameter_initial: [0] }, { text: "Filter", texton: "Filter", mode: 1, fontsize: 9 }, "f_route" + n),
       A.obj(vPre, "prepend route " + n, [1500 + n * 70, 380, 90, 20]));
     lines.push(A.line(vT, 0, vPre, 0), A.line(vPre, 0, vV8, 0));
     routeIds[n] = vT;

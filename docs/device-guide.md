@@ -24,10 +24,12 @@ Sync and ring modulation link each oscillator to the previous one: 2 to 1, 3 to 
 Each oscillator has a table. It is the C64 technique behind percussive attacks and drums: a short list of steps played quickly, either once at note-on or as a loop. Each step sets a waveform, sync and ring, and a pitch. The pitch can be unchanged, a fixed note, or an offset in semitones from the played note.
 
 - `Osc n Table Speed` 0 turns the table off. A higher value plays it more slowly.
-- The steps live in `Osc n Table Data`, which Live cannot read. A program edits the table one step at a time through the Push knobs:
-  1. Set `Table Step` in a call of its own.
-  2. Then set `Table Wave` (Tri, Saw, Pulse, Mix, Noise, Off, or Keep for the oscillator's own waveform), `Table Mod` (None, Sync, Ring, S+R), `Table Pitch` (Keep, Fixed, Relative), and `Table Note` or `Table Offset` (±47).
-- `Table Length` adds or removes steps at the end. `Table Loop` chooses whether the table plays once or loops back to `Table Loop To`, which must be an earlier step.
+- The table is the parameters `Osc n Step 00` to `Osc n Step 64` (short names `Step 00 Osc1` …), one per cell of the synth's table. Read them to see the table; write them to change it. Value = DATA1 × 256 + DATA2:
+  - 65280 is End; 65024 + t is Loop to step t (an earlier step). The table is the cells before the first End or Loop; the cells after it are ignored.
+  - Otherwise a step. DATA1 = wave × 16 + ring × 4 + sync × 2, with wave Tri 1, Saw 2, Pulse 4, Mix 5, Noise 8, Off 0, Keep (the oscillator's own waveform) 9.
+  - DATA2 = 0 to 127 for a fixed note F n, which plays MIDI note n + 12; 128 + k is k semitones down, 192 + k is k semitones up, 255 leaves the pitch unchanged.
+  - Example: 4156 (16 × 256 + 60) is Tri at fixed note F60, which sounds as MIDI 72.
+- Push edits the table step by step instead: `Table Step` chooses the step, then `Table Wave`, `Table Mod`, `Table Pitch`, `Table Note` or `Table Offset`, `Table Length`, `Table Loop` and `Table Loop To`. A program should write the Step parameters.
 - While a table plays, it sets the oscillator's waveform. Steps set to Keep, and the start of every note, use the oscillator's `Wave`.
 
 ## Filter

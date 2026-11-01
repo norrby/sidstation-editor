@@ -17,7 +17,7 @@ function loadRouter(oscNo, armed = true, restoreTrack = true) {
   const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.osc.js"), "utf8").replace(/^inlets = 1;\noutlets = 3;\n/m, "");
   const fn = new Function(...Object.keys(g), src + "\nreturn { msg_int, param, sendall, arm, msg: (n, ...a) => { const fns = { trackmode, tracknote, sendall, arm, channel, quiet }; if (fns[n]) return fns[n](...a); messagename = n; anything(...a); } };");   // v8 calls named functions before anything
   const r = fn.call({}, ...Object.values(g));
-  for (const d of SidParams.OSC) r.param(d.key, d.init);                   // Live restores every parameter on load: the starting point
+  for (const d of SidParams.OSC) r.param(d.key, SidParams.initOf(d, 1));                   // Live restores every parameter on load: the starting point
   if (restoreTrack) { r.msg("trackmode", 0); r.msg("tracknote", 60); }     // (Track is two Live parameters)
   out.length = 0;
   if (armed) r.arm();
@@ -122,7 +122,7 @@ test("the first value of a parameter (Live restoring it on load) is never sent, 
   const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.osc.js"), "utf8").replace(/^inlets = 1;\noutlets = 3;\n/m, "");
   const r = new Function(...Object.keys(g), src + "\nreturn { param, arm, sendall };").call({}, ...Object.values(g));
   r.arm();                                                                 // "armed" before the restore (seen with a frozen device)
-  for (const d of SidParams.OSC) r.param(d.key, d.init);
+  for (const d of SidParams.OSC) r.param(d.key, SidParams.initOf(d, 1));
   assert.deepEqual(bus(out), [], "the restore goes nowhere");
   r.param("wave", 1);
   assert.ok(bus(out).length > 0, "a change after that is sent");

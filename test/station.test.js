@@ -265,13 +265,16 @@ test("SidStation: Patch Action is an automated parameter off screen and off Push
   assert.deepEqual([text(from(pushT, 0)[0]), text(from(pushT, 1)[0])], ["pushed", "sendall"], "sendall first (right outlet), then pushed to the gateway");
 });
 
-test("SidStation: Store patch is greyed until Push patch – the gateway's storable state reaches the button and the overview, pushed and arm reach the gateway", () => {
+test("SidStation: Store patch is greyed until Push patch – the gateway's storable state reaches the button and the overview, pushed and arm reach the gateway; Push stays lit while sending", () => {
   const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", NAME + ".amxd")).json.patcher;
   const text = (id) => (p.boxes.find((b) => b.box.id === id) || { box: {} }).box.text;
   const from = (id, outlet) => p.lines.filter((l) => l.patchline.source[0] === id && l.patchline.source[1] === outlet).map((l) => l.patchline.destination[0]);
   const byVar = (v) => p.boxes.find((b) => b.box.varname === v).box;
   const gate = byVar("gateway"), store = byVar("c_store"), map = byVar("map");
-  const [route] = from(gate.id, 1); assert.equal(text(route), "route noreply answered sent storable");
+  const [route] = from(gate.id, 1); assert.equal(text(route), "route noreply answered sent storable pushing");
+  const push = byVar("c_sendall");
+  assert.equal(push.mode, 1, "Push patch is a toggle, lit until the gateway says pushing 0");
+  assert.deepEqual(from(from(route, 4)[0], 0), [push.id]); assert.equal(text(from(route, 4)[0]), "prepend set");
   assert.deepEqual(from(route, 3).map(text).sort(), ["active $1", "prepend storable"]);
   assert.deepEqual(from(from(route, 3).find((id) => text(id) === "active $1"), 0), [store.id], "greys the Store button");
   assert.deepEqual(from(from(route, 3).find((id) => text(id) === "prepend storable"), 0), [map.id], "the overview shows the notice");

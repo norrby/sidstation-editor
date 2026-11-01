@@ -62,7 +62,7 @@ function lfoPanel(cx0, ctx) {
       if (cls === "live.menu") extra = { fontsize: 9 };
       if (cls === "live.tab") extra = { mode: 0, num_lines_patching: 1, num_lines_presentation: 1, spacing_x: 2, fontsize: 9, pictures: LFO_ICONS, usepicture: 1, remapsvgcolors: 1 };
       const Lb = id(), prep = id(), py = by + 50 + row++ * 30;
-      boxes.push(live(Lb, cls, [3200, py, 60, cls === "live.dial" ? 48 : 18], px(rect), valueof(d, "LFO" + n + " "), extra, pre + d.key),
+      boxes.push(live(Lb, cls, [3200, py, 60, cls === "live.dial" ? 48 : 18], px(rect), valueof(d, "LFO" + n + " ", n), extra, pre + d.key),
         A.obj(prep, "prepend lfo " + n + " " + d.key, [3300, py, 130, 20]));
       lines.push(A.line(Lb, 0, prep, 0), A.line(prep, 0, vLfo, 0));
       items.push({ name: pre + d.key, rect });

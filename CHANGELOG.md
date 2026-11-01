@@ -15,6 +15,18 @@ All notable changes to SidStation Editor are listed here, newest first. The form
 
 ### Changed
 
+- **Push patch stays lit until everything has been sent** to the synth, so a press is seen even
+  while the editor is busy sending (the button used to stay dark).
+- **The waveform tables are Live parameters**: one per cell of the synth's table, "Osc n Step 00" to
+  "Osc n Step 64" (value DATA1 × 256 + DATA2, as the synth stores it). A program driving the editor
+  through Live's API can now read and write the tables, and every table edit is ordinary Live undo.
+  They are stored with the set, but not automated and not on Push. A table saved by an older editor
+  moves into them when the set is opened.
+- **A new editor starts as the synth's own New Patch**, the sound the synth gives a patch it
+  creates, named "New Patch": oscillator 1 alone (2 and 3 off, set an octave up and down),
+  nothing through the filter. Before, it started with a sound of its own that the synth never had.
+  Saved sets keep their values. The device description says how to make the synth and the editor
+  alike: dump the patch from the synth (System > MIDI > SYSEXDump = Patch), or press Push patch.
 - **Every parameter's short name is unique**, so a program reading the device through Live's API
   (which shows only short names) can tell the four A, D, S and R apart. The short name puts the
   parameter first and its group last: "A Osc1", "Speed Tbl Osc2", "Cut Filt", "Lace Sp LFO3";

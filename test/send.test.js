@@ -134,3 +134,15 @@ test("Store goes grey on a patch CC or program change from the track; playing co
   w.pushed(); w.msg_int(0xc0); w.msg_int(5);                           // a program change
   assert.deepEqual(storable(), [1, 0, 1, 0]);
 });
+
+test("Push patch: the button stays lit (pushing 1) until everything it queued has been sent (pushing 0)", () => {
+  const { w, ev, run } = loadGateway();
+  const pushing = () => ev.filter((e) => e[0] === "pushing").map((e) => e[1]);
+  w.frame(...DP_TRI); w.frame(...DP_TRI); w.frame(...DP_TRI);   // the routers' frames: the first goes at once, the rest wait
+  w.pushed();
+  assert.deepEqual(pushing(), [1]);
+  run();
+  assert.deepEqual(pushing(), [1, 0], "off once the queue is empty");
+  w.frame(...DP_TRI); run();
+  assert.deepEqual(pushing(), [1, 0], "an edit afterwards says nothing");
+});

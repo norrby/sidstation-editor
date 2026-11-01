@@ -149,6 +149,22 @@ function oscPanel(n, cx0, ctx) {
       saved_attribute_attributes: { valueof: { parameter_longname: longPre + "Table Data", parameter_shortname: "Table", parameter_type: 3, parameter_invisible: 1, parameter_modmode: 0 } } } },
     A.obj(vTableRoute, "route bytes", [1000, py + 160, 70, 20], 2, ["", ""]), A.obj(vTablePre, "prepend table", [1000, py + 185, 90, 20]));
   lines.push(A.line(vTable, 0, vTableRoute, 0), A.line(vTableRoute, 0, vTablePre, 0), A.line(vTablePre, 0, vV8, 0));
+  // The table itself: one Live parameter per cell of the synth's table, "Osc n Step 00" .. "Osc n Step 64", value DATA1 * 256 + DATA2
+  // (sid.table.js). Stored and seen by Live's API, so a program can read the table; not automated and in no bank (invisible 3).
+  // The parameter -> [prepend cell i] -> the widget; the widget's "cell i v" -> [route cell] -> [route 0 … 64] -> the parameter (a
+  // value, not "set", so that Live keeps it; it comes back as "cell", which the widget already holds).
+  const vCellRoute = id(), vCellIdx = id(), cellNos = Array.from({ length: P.TABLE_ROWS }, (_, i) => i);
+  boxes.push(A.obj(vCellRoute, "route cell", [1000, py + 520, 70, 20], 2, ["", ""]),
+    A.obj(vCellIdx, "route " + cellNos.join(" "), [1000, py + 545, 900, 20], P.TABLE_ROWS + 1, new Array(P.TABLE_ROWS + 1).fill("")));
+  lines.push(A.line(vTable, 0, vCellRoute, 0), A.line(vCellRoute, 0, vCellIdx, 0));
+  for (const i of cellNos) {
+    const vC = id(), vCp = id(), cx = 1000 + i * 50, nn = String(i).padStart(2, "0");
+    boxes.push(live(vC, "live.numbox", [cx, py + 575, 44, 18], null, { parameter_longname: longPre + "Step " + nn, parameter_shortname: "Step " + nn,
+      parameter_type: 0, parameter_mmin: 0, parameter_mmax: 65535, parameter_unitstyle: UNIT.int, parameter_invisible: 3,   // float: an int parameter stops at 255 parameter_modmode: 0,
+      parameter_initial_enable: 1, parameter_initial: [P.tableCellInit(i)] }, { fontsize: 9 }, pre + "cell" + nn),
+      A.obj(vCp, "prepend cell " + i, [cx, py + 600, 70, 20]));
+    lines.push(A.line(vCellIdx, i, vC, 0), A.line(vC, 0, vCp, 0), A.line(vCp, 0, vTable, 0));
+  }
   const vLoopBtn = id(), vLoopPre = id(), vLoopRoute = id(), vLoopSet = id();     // the one-shot/loop button <-> the table
   boxes.push(v8ui(vLoopBtn, "sid.loopbtn.js", [1100, py + 160, 44, 18], pt(TABLE_LOOP), pre + "tableloop"),
     A.obj(vLoopPre, "prepend loopmode", [1100, py + 185, 100, 20]), A.obj(vLoopRoute, "route loop", [1200, py + 160, 70, 20], 2, ["", ""]),
@@ -209,7 +225,7 @@ function oscPanel(n, cx0, ctx) {
     if (cls === "live.menu" || cls === "live.numbox") extra = { fontsize: 9 };
     if (cls === "live.tab") extra = { mode: 0, num_lines_patching: 6, num_lines_presentation: 6, spacing_x: 2, spacing_y: 2, pictures: WAVE_ICONS, usepicture: 1, remapsvgcolors: 1 };
     const Lb = id(); ids[d.key] = Lb;
-    const vo = valueof(d, longPre);
+    const vo = valueof(d, longPre, n);
     if (d.key === "wave") vo.parameter_shortname = "Osc " + n;        // Push shows the three side by side on its Main bank (Off = the oscillator off)
     boxes.push(live(Lb, cls, [x, py + 210, 60, cls === "live.dial" ? 48 : cls === "live.tab" ? 100 : 18], pres, vo, extra, pre + d.key));
     if (d.key === "wave") waveId = Lb;

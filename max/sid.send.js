@@ -26,6 +26,7 @@
 //   arm             on load: says the Store state ("storable 0") so the button starts grey
 // Store goes grey again after any change: a router frame, a request, a failed queue, and from the track a program
 // change or a CC that sets a patch parameter (changesSound).
+// "pushing 1|0" on outlet 1: the Push button lit while what Push patch queued is being sent.
 // "storable 0|1" on outlet 1: Store patch is allowed only right after Push patch (the button is greyed otherwise, see below).
 // Every request that expects an answer is timed (Live can lose its input port, and Pull then just does nothing): 05 -> a dump, 06 -> 46, 07 -> 47. No answer within 3 s: a log line and
 // "noreply <dump|settings|store>" on outlet 1, and "sent" after every router frame (the name display shows NO REPLY until "answered" – any reply – or a click).
@@ -47,7 +48,13 @@ const waiting = { dump: null, settings: null };   // the Tasks that time out a 0
 // sound can be stored to a second patch number. "storable 0|1" on outlet 1 greys the Store button and shows the notice
 // (build-station.js); a store while not storable is refused, also from Patch Action.
 let storable = false;
-function pushed() { storable = true; outlet(1, "storable", 1); status("pushed: the synth has the editor's sound, Store patch saves it to the patch number on the synth"); }
+// "pushing 1|0" on outlet 1 keeps the Push button lit from "pushed" until the queue is empty (the button lights itself when pressed).
+let pushing = false;
+function pushed() {
+  storable = true; outlet(1, "storable", 1); status("pushed: the synth has the editor's sound, Store patch saves it to the patch number on the synth");
+  pushing = queue.length > 0; outlet(1, "pushing", pushing ? 1 : 0);
+}
+function pushDone() { if (!pushing) return; pushing = false; outlet(1, "pushing", 0); }
 function touched() { if (!storable) return; storable = false; outlet(1, "storable", 0); }
 function arm() { outlet(1, "storable", storable ? 1 : 0); }
 
@@ -68,16 +75,16 @@ function pace(m) {
 // drop the queue and say so (the store lock, if any, still ends by its reply or timeout).
 function drain() {
   try { drainOne(); }
-  catch (e) { queue = []; task = null; touched(); status("STOP: error while sending (" + e.message + "), queue dropped"); }
+  catch (e) { queue = []; task = null; touched(); pushDone(); status("STOP: error while sending (" + e.message + "), queue dropped"); }
 }
 function drainOne() {
   if (!task) return;
   if (storing) { task.schedule(10); return; }                // store lock: nothing to the synth until the reply
-  if (!queue.length) { task = null; return; }
+  if (!queue.length) { task = null; pushDone(); return; }
   const m = queue.shift();
   if (m[0] === 0xf0) {                                       // last check right before sending
     const v = validate(m);
-    if (!v.ok) { queue = []; task = null; touched(); status("STOP: frame failed validation while sending (" + v.reason + ")"); return; }
+    if (!v.ok) { queue = []; task = null; touched(); pushDone(); status("STOP: frame failed validation while sending (" + v.reason + ")"); return; }
   }
   for (const b of m) outlet(0, b);
   if (m[0] === 0xf0 && m[6] === ID_STORE) lockStore();

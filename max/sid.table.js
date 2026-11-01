@@ -20,7 +20,15 @@
 // R33's step routine ($9471–$94A0) settles DATA2: 00..7F fixed, pitch = DATA2 + 12 ($949B ADDA #$0C; the base pitch is the MIDI
 // note, $9443–$946A), 80..BF subtract DATA2 & 3F, C0..FE add DATA2 & 3F, FF = no change ("---"). DATA1 >= $90 keeps the wave.
 //
-// In:  bytes d1 d2 d1 d2 … [FE xx | FF]   load a table as stored in a dump
+// Storage: the table IS 65 Live parameters per oscillator, "Osc n Step 00" .. "Osc n Step 64" (build/station/voice.js), one per
+// cell of the synth's table (130 bytes: 65 cells of two bytes), value = DATA1 * 256 + DATA2: FF00 = End, FE00 + t = Loop to t,
+// anything else a step. The table is the cells before the first End/Loop; the cells after it are kept (they come back when the
+// table grows). Any program reading the device through Live's API sees the table this way. An edit writes the cells it changes
+// (each a step in Live's undo history, so one click is one Cmd+Z); a cell that changes from outside (Live's restore on load, undo,
+// redo, a program) is shown and sent to the synth, and never written back. Osc n Table Data, the blob the table used to be kept
+// in, is read once from a set saved with 0.3.2 or earlier and moved into the cells (getvalueof/setvalueof below).
+// In:  cell i v   a Step parameter's value (restore, undo, a program, or the echo of our own write)
+//      bytes d1 d2 d1 d2 … [FE xx | FF]   load a table as stored in a dump
 //      clear | bang (outputs)
 //      speed n      the table speed (0 = no table) and rate <Hz> the update rate (the patch's Sync Speed, default 100)
 //      note 1|0     note on/off from the track: runs a playhead like the OS's table player ($95DD–$9650 in R33): at note on
@@ -32,7 +40,8 @@
 //                   (clamped to the table), and for the
 //                   step under the cursor wave 0..6, mod = sync | ring << 1 (as the mod button), pitch 0 --- | 1 fixed | 2 relative,
 //                   note = the fixed note F 0..81 (the knob's list of names), offset -47..47. A note or offset also sets the pitch mode.
-// Out: "steps n end|loop target" and "bytes …" on outlet 0 after every change (on mouse up while dragging), "knob <key> <v>"
+// Out: "cell i v" for every Step parameter an edit changes, "steps n end|loop target" and "bytes …" on outlet 0 after every change
+//      (on mouse up while dragging), "knob <key> <v>"
 //      for every Push knob whose value should change, so they show the step under the cursor (the value goes INTO the knob, so
 //      that Live and Push follow – a silent "set" left Live's value behind – and comes straight back here as "push": the echo is
 //      told apart by a flag, as the patcher runs the chain synchronously), and "bank 0|1" when the step's pitch mode changes
@@ -74,6 +83,9 @@ const C = {
 
 const born = Date.now();
 let steps = [], n = 0, term = "end", target = 0;
+const CELL_END = 0xff00, CELL_LOOP = 0xfe00, CELL_STEP = 0x10ff;          // a new device: End in cell 0, Tri with no pitch change in the rest
+const CELL_INIT = Array.from({ length: 65 }, (_, i) => (i === 0 ? CELL_END : CELL_STEP));
+let cells = CELL_INIT.slice();                                            // the Step parameters as Live holds them
 let speed = 0, rateHz = 120, held = 0, play = -1, cnt = 0, t0 = 0, done = 0;
 const ticker = new Task(pump, this);
 let drag = null, hover = -1, msg = "", off = 0;   // off: the first visible column
@@ -93,7 +105,7 @@ const PITCH_MODES = ["keep", "F", "rel"];
 
 function newStep() { return { wave: 0, sync: 0, ring: 0, mode: "keep", fixed: 48, rel: 0 }; }
 function reset() { steps = []; for (let i = 0; i < MAXCOL; i++) steps.push(newStep()); n = 0; term = "end"; target = 0; mgraphics.redraw(); }   // the smallest table: End alone, as in most factory patches
-function clear() { reset(); out(); }
+function clear() { n = 0; term = "end"; target = 0; mgraphics.redraw(); out(); }   // the steps after the table stay, as in the cells
 
 // --- geometry -------------------------------------------------------------
 
@@ -344,8 +356,8 @@ function changed(quietWhileDragging) { mgraphics.redraw(); if (!(quietWhileDragg
 
 // --- Push ------------------------------------------------------------------
 
-// Live's undo. Every knob change is a step in Live's undo history, and so is every change of the stored table (Osc n Table Data), so
-// one edit from a knob is several steps. Undoing them turns the knobs back and restores the stored table (setvalueof). A knob turned
+// Live's undo. Every knob change is a step in Live's undo history, and so is every Step parameter the edit writes, so one edit from
+// a knob is several steps. Undoing them turns the knobs back and restores the cells (cell). A knob turned
 // by an undo or redo must not edit the table as well: the table's own step puts it back, and applying the knob too wrote the table
 // again – a new step that emptied the redo list, and the table ended up wrong. While Live has something to redo, a knob change comes
 // from an undo or redo: a change of one's own empties the redo list, but only after the value has arrived here, so the knob changes
@@ -423,38 +435,79 @@ function knobs() {
 // A step read from the synth keeps its bytes and goes back unchanged until it is edited: Pull + Push gives the same table even
 // where the editor shows an approximation (an unknown waveform code, the unused bits 0 and 3, a difference over 47).
 const stepKey = (s) => [s.wave, s.sync, s.ring, s.mode, s.fixed, s.rel].join(" ");
+function stepBytes(s) {
+  if (s.raw && stepKey(s) === s.rawKey) return s.raw;
+  // no change = FF (R33 $9480); a difference of 0 is the same thing to the synth (adds 0), so it is written as FF too
+  return [WAVES[s.wave].code << 4 | s.ring << 2 | s.sync << 1, s.mode === "F" ? s.fixed : s.mode === "keep" || s.rel === 0 ? 0xff : s.rel >= 0 ? 0xc0 + s.rel : 0x80 - s.rel];
+}
 function encode() {
   const b = [];
-  for (let i = 0; i < n; i++) {
-    const s = steps[i];
-    if (s.raw && stepKey(s) === s.rawKey) { b.push(s.raw[0], s.raw[1]); continue; }
-    b.push(WAVES[s.wave].code << 4 | s.ring << 2 | s.sync << 1);
-    // no change = FF (R33 $9480); a difference of 0 is the same thing to the synth (adds 0), so it is written as FF too
-    b.push(s.mode === "F" ? s.fixed : s.mode === "keep" || s.rel === 0 ? 0xff : s.rel >= 0 ? 0xc0 + s.rel : 0x80 - s.rel);
-  }
+  for (let i = 0; i < n; i++) b.push(...stepBytes(steps[i]));
   // the target is clamped: never FE FF (target -1 after 0 steps went out as FF)
   if (n < MAXCOL) { if (term === "loop") b.push(0xfe, Math.max(0, Math.min(target, n - 1))); else b.push(0xff); }
   return b;
 }
 
+function readStep(d1, d2) {
+  const s = newStep(), w = WAVES.findIndex((v) => v.code === d1 >> 4);
+  s.wave = w < 0 ? 6 : w; s.ring = (d1 >> 2) & 1; s.sync = (d1 >> 1) & 1;
+  if (d2 === 0xff) s.mode = "keep";
+  else if (d2 <= 0x7f) { s.mode = "F"; s.fixed = d2; }                        // 00..7F (the panel only offers 00..51)
+  else if (d2 < 0xc0) { s.mode = "rel"; s.rel = -(d2 - 0x80); }
+  else { s.mode = "rel"; s.rel = d2 - 0xc0; }
+  s.raw = [d1 & 0xff, d2 & 0xff]; s.rawKey = stepKey(s);
+  return s;
+}
+// A table from a dump (sid.load.js): the steps after it stay as they are.
 function bytes() {
   const a = arrayfromargs(arguments).map(Number);
-  steps = []; for (let i = 0; i < MAXCOL; i++) steps.push(newStep());
   n = 0; term = "end"; target = 0;
   for (let k = 0; k < a.length && n < MAXCOL; k += 2) {
     const d1 = a[k], d2 = a[k + 1];
     if (d1 === 0xff) break;
     if (d1 === 0xfe) { term = "loop"; target = Math.min(d2 | 0, Math.max(0, n - 1)); break; }
-    const s = steps[n++], w = WAVES.findIndex((v) => v.code === d1 >> 4);
-    s.wave = w < 0 ? 6 : w; s.ring = (d1 >> 2) & 1; s.sync = (d1 >> 1) & 1;
-    if (d2 === 0xff) s.mode = "keep";
-    else if (d2 <= 0x7f) { s.mode = "F"; s.fixed = d2; }                        // 00..7F (the panel only offers 00..51)
-    else if (d2 < 0xc0) { s.mode = "rel"; s.rel = -(d2 - 0x80); }
-    else { s.mode = "rel"; s.rel = d2 - 0xc0; }
-    s.raw = [d1 & 0xff, d2 & 0xff]; s.rawKey = stepKey(s);
+    steps[n++] = readStep(d1, d2);
   }
   sidlog("table", "in:", n, "steps,", n >= MAXCOL ? "full (no command)" : term === "loop" ? "loop to " + target : "end");
   mgraphics.redraw(); out();
+}
+
+// --- the Step parameters ----------------------------------------------------
+
+// What the cells should hold for the table as it is now: the steps, then End or Loop; the cells after that keep their values.
+function cellsNow() {
+  const c = cells.slice();
+  for (let i = 0; i < n; i++) { const b = stepBytes(steps[i]); c[i] = b[0] << 8 | b[1]; }
+  if (n < MAXCOL) c[n] = term === "loop" ? CELL_LOOP | Math.max(0, Math.min(target, n - 1)) : CELL_END;
+  return c;
+}
+// The table from the cells: every cell that is a step becomes that step (also after the command, so a longer table shows them).
+function fromCells() {
+  n = MAXCOL; term = "end"; target = 0;
+  for (let i = 0; i < MAXCOL; i++) {
+    const d1 = cells[i] >> 8 & 0xff, d2 = cells[i] & 0xff;
+    if (d1 === 0xff || d1 === 0xfe) {
+      if (n === MAXCOL) { n = i; if (d1 === 0xfe && i > 0) { term = "loop"; target = Math.min(d2, i - 1); } }
+      continue;
+    }
+    if (!steps[i].raw || steps[i].raw[0] !== d1 || steps[i].raw[1] !== d2 || stepKey(steps[i]) !== steps[i].rawKey) steps[i] = readStep(d1, d2);
+  }
+}
+// A Step parameter's value. Several arrive together (a set loading, an undo of a drag), so the table is rebuilt once after them.
+const showCells = typeof LiveAPI === "undefined" ? null : new Task(() => showFromCells(), this);
+function cell(i, v) {
+  i = Math.round(Number(i)); v = Math.round(Number(v));
+  if (!(i >= 0 && i < MAXCOL) || !Number.isFinite(v) || cells[i] === v) return;  // our own write coming back changes nothing
+  cells[i] = v;
+  if (legacy) migrate.schedule(MIGRATE_MS);
+  if (showCells) showCells.schedule(0); else showFromCells();
+}
+function showFromCells() {
+  fromCells();
+  sidlog("table", "from the Step parameters:", n, "steps,", n >= MAXCOL ? "full (no command)" : term === "loop" ? "loop to " + target : "end");
+  cursor = Math.min(cursor, Math.max(0, n - 1));
+  restoring = true;
+  try { mgraphics.redraw(); out(); } finally { restoring = false; }
 }
 
 // --- playhead (simulation of the OS's table player) ---------------------------
@@ -497,28 +550,35 @@ function loopmode(v) {
   if (Number(v) && n > 0) { if (n >= MAXCOL) n = MAXCOL - 1; term = "loop"; target = Math.max(0, Math.min(target, n - 1)); } else term = "end";   // no Loop on an empty table (it would loop to itself)
   changed();
 }
-// Stored by Live (the box is a hidden blob parameter): [1 (format), n, encoded table…]. setvalueof loads it like a dump; the router
-// takes the first table after loading as its baseline, so a restore is not echoed to the synth (a preset recall later is sent).
-function getvalueof() { return [1, n].concat(encode()); }
-// Live restores the stored table on load and on undo/redo. That is no change of ours: telling Live about it (notifyclients) or moving
-// the knobs (each write a step in the undo history) would add steps of its own and empty the redo list. The knobs catch up with the
-// next edit; the table still goes to the synth (the router sends only what differs, and nothing on load).
-let restoring = false, stored = "";                                       // stored: the value Live holds, as last told or restored
+// Osc n Table Data, the hidden blob parameter the table was kept in up to 0.3.2: [1, n, encoded table…]. It now says only [2] ("in
+// the Step parameters"). A set saved with 0.3.2 or earlier brings format 1 and Step parameters at their initial values (it had none): once
+// the set has settled (MIGRATE_MS after the last restore), that table is written into the cells and the blob is told it is format 2
+// – a few steps in Live's undo history, once, for such a set only. A new device has no stored blob and writes nothing.
+const MIGRATE_MS = 1000;
+let restoring = false, legacy = null, format = 2;
+function getvalueof() { return [format]; }
 function setvalueof() {
   const a = arrayfromargs(arguments).map(Number);
-  if (a[0] !== 1 || a.length < 3) { sidlog("table", "stored value ignored (format", a[0], "length", a.length + ")"); return; }
-  const len = a[1], b = a.slice(2);
-  restoring = true;
-  try {
-    bytes.apply(this, b);
-    if (len >= MAXCOL && n !== len) { n = len; mgraphics.redraw(); out(); }   // a full table (no command) is not told apart by bytes()
-  } finally { restoring = false; }
-  stored = getvalueof().join(" ");
-  sidlog("table", "restored from Live:", n, "steps");
+  format = a[0] === 1 ? 1 : 2;
+  if (a[0] !== 1) return;
+  legacy = { len: a[1], b: a.slice(2) };
+  sidlog("table", "a table saved by an older editor (0.3.2 or earlier):", a[1], "steps");
+  migrate.schedule(MIGRATE_MS);
 }
+const migrate = new Task(() => {
+  if (!legacy) return;
+  const old = legacy; legacy = null;
+  if (cells.some((v, i) => v !== CELL_INIT[i])) { sidlog("table", "the Step parameters hold a table already: the old one is not moved"); return; }
+  bytes.apply(this, old.b);                                                 // writes the cells (out)
+  if (old.len >= MAXCOL && n !== old.len) { n = old.len; out(); }           // a full table (no command) is not told apart by bytes()
+  format = 2; try { notifyclients(); } catch (e) {}
+  sidlog("table", "the older table moved into the Step parameters:", n, "steps");
+}, this);
 function out() {
-  const now = getvalueof().join(" ");
-  if (!restoring && now !== stored) { stored = now; try { notifyclients(); } catch (e) {} }   // Live: the stored value changed (one undo step)
+  if (!restoring) {
+    const c = cellsNow();
+    for (let i = 0; i < MAXCOL; i++) if (c[i] !== cells[i]) { cells[i] = c[i]; outlet(0, "cell", i, c[i]); }   // Live: one undo step each
+  }
   outlet(0, "steps", n, term, target);
   outlet(0, "loop", term === "loop" && n < MAXCOL ? 1 : 0);              // -> the button
   outlet(0, ["bytes"].concat(encode()));
@@ -536,6 +596,9 @@ function anything() {
 }
 
 paint = sidguard("table", paint); note = sidguard("table", note); rate = sidguard("table", rate); anything = sidguard("table", anything); tick = sidguard("table", tick); onclick = sidguard("table", onclick); ondrag = sidguard("table", ondrag); bytes = sidguard("table", bytes);
-onidle = sidguard("table", onidle); ondblclick = sidguard("table", ondblclick); setvalueof = sidguard("table", setvalueof); push = sidguard("table", push);
+onidle = sidguard("table", onidle); ondblclick = sidguard("table", ondblclick); setvalueof = sidguard("table", setvalueof); push = sidguard("table", push); cell = sidguard("table", cell);
 reset();                                                                 // silent: a reload (autowatch) must not send an empty table to the synth
+// The router takes the first table it gets as what the synth has (nothing is sent before the device is armed). A new device's cells
+// keep their initial values, so no cell arrives: the table as the cells give it goes to the router once, after Live's restore.
+if (showCells) showCells.schedule(0);
 sidlog("table", "loaded");

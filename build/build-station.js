@@ -161,20 +161,20 @@ function buildDevice(title) {
     // [midiout] (on to External Instrument). The track's input goes to the capture (dumps saved, patches/replies to the loader
     // and the gateway, nothing global) and to the osc 1 router, which passes notes and drops SysEx (the echo rule).
     const vGate = id(), vCap = id(), vStored = id(), vStoredPre = id(), vCapRoute = id(), vRepliedPre = id(), vGateRoute = id(), vNoReplyPre = id(), vAnsweredPre = id(), vSentMsg = id();
-    const vStoreActive = id(), vStorablePre = id();                        // "storable 0|1" -> the Store button's active state and the overview's notice
+    const vStoreActive = id(), vStorablePre = id(), vPushingSet = id();     // "pushing 1|0" -> the Push button lit while sending                        // "storable 0|1" -> the Store button's active state and the overview's notice
     boxes.push(A.obj(vGate, "v8 sid.send.js", [30, 500, 100, 20], 2, ["", ""], { varname: "gateway" }),
       A.obj(vCap, "v8 sid.capture.js", [200, 60, 110, 20], 1, [""], { varname: "capture" }),
       A.obj(vCapRoute, "route stored replied", [200, 90, 120, 20], 3, ["", "", ""]), A.obj(vStoredPre, "prepend stored", [200, 120, 90, 20]),
-      A.obj(vRepliedPre, "prepend replied", [300, 120, 90, 20]), A.obj(vGateRoute, "route noreply answered sent storable", [140, 530, 200, 20], 5, ["", "", "", "", ""]), A.obj(vNoReplyPre, "prepend noreply", [140, 560, 100, 20]),
+      A.obj(vRepliedPre, "prepend replied", [300, 120, 90, 20]), A.obj(vGateRoute, "route noreply answered sent storable pushing", [140, 530, 240, 20], 6, ["", "", "", "", "", ""]), A.obj(vNoReplyPre, "prepend noreply", [140, 560, 100, 20]),
       A.obj(vAnsweredPre, "prepend answered", [250, 560, 100, 20]), A.msg(vSentMsg, "outside", [360, 560, 50, 20]),
-      A.msg(vStoreActive, "active $1", [420, 560, 60, 20]), A.obj(vStorablePre, "prepend storable", [490, 560, 100, 20]),
+      A.msg(vStoreActive, "active $1", [420, 560, 60, 20]), A.obj(vStorablePre, "prepend storable", [490, 560, 100, 20]), A.obj(vPushingSet, "prepend set", [600, 560, 70, 20]),
       A.obj(vStored, "t l l", [320, 90, 40, 20], 2, ["", ""]));
     lines.push(A.line(vMidiin, 0, vCap, 0), A.line(vCap, 0, vStored, 0), A.line(vStored, 1, vRxDefer, 0), A.line(vStored, 0, vCapRoute, 0),
       A.line(vCapRoute, 0, vStoredPre, 0), A.line(vStoredPre, 0, vGate, 0), A.line(vCapRoute, 1, vRepliedPre, 0), A.line(vRepliedPre, 0, vGate, 0),
       A.line(vGate, 1, vGateRoute, 0), A.line(vGateRoute, 0, vNoReplyPre, 0), A.line(vNoReplyPre, 0, ctx.nameId, 0), A.line(vGateRoute, 1, vAnsweredPre, 0), A.line(vAnsweredPre, 0, ctx.nameId, 0),
       A.line(vGateRoute, 2, vSentMsg, 0), A.line(vSentMsg, 0, ctx.nameId, 0),
       A.line(vGateRoute, 3, vStoreActive, 0), A.line(vStoreActive, 0, ctx.storeBtnId, 0), A.line(vGateRoute, 3, vStorablePre, 0), A.line(vStorablePre, 0, ctx.mapId, 0),
-      A.line(ctx.pushedId, 0, vGate, 0), A.line(ctx.pushCCTriggerId, 0, ctx.pushedId, 0),
+      A.line(vGateRoute, 4, vPushingSet, 0), A.line(vPushingSet, 0, ctx.pushBtnId, 0), A.line(ctx.pushedId, 0, vGate, 0), A.line(ctx.pushCCTriggerId, 0, ctx.pushedId, 0),
       A.line(oscs[1].vV8, 0, vGate, 0), A.line(vGate, 0, vMidiout, 0));
     for (const [r, k] of routers) lines.push(A.line(r, k, vGate, 0));
     ctx.armTargets.push(vGate);                                            // "arm" on load: the gateway answers "storable 0", so Store starts grey
@@ -207,12 +207,15 @@ const LAYOUTS = {};
   const { json, layout, width } = buildDevice(DEVICE);
   // Live's Info View for the device itself (empty, Live showed a generic "MIDI Effect" text)
   json.patcher.description = DEVICE + " " + VERSION + ". Editor for the Elektron SidStation: every patch parameter as a Live parameter, with Pull, Push and Store patch. Not affiliated with Elektron.\n\n"
-    + "For a program driving the device through Live's API: every change to a parameter goes to the synth right away. After a set loads, the synth may still play "
-    + "another sound than the editor shows, and setting a control to the value it already shows sends nothing; ask the user to press Push patch before shaping a sound. A program must never choose Pull patch or Push patch "
+    + "For a program driving the device through Live's API: every change to a parameter goes to the synth right away. A new editor holds the synth's own New Patch, the sound "
+    + "the synth gives a patch it creates. After the device or a set loads, the synth may still play another sound than the editor shows, and setting a control to the "
+    + "value it already shows sends nothing. To make them alike, ask the user either to dump the patch from the synth (System > MIDI > SYSEXDump = Patch, which sends "
+    + "the patch as stored, so the editor takes it) or to press Push patch, before shaping a sound. A program must never choose Pull patch or Push patch "
     + "unless the user asks for it, and must never choose Store patch unless the user explicitly asks to store. Pull patch replaces every setting in the editor with the "
     + "patch number the synth shows; Push patch sends the whole editor state together, for example after a saved set has been loaded (loading sends nothing); Store patch "
-    + "overwrites the patch number the synth shows for good, and is allowed only right after Push patch (greyed and refused otherwise). Patch Action (None, Pull patch, Push patch, Store patch) presses those buttons and goes back to None by itself. A waveform table is edited through Osc n Table Step, set first in a call of its own, then the step's Table Wave, Mod, "
-    + "Pitch and Note or Offset; Table Length, Loop and Loop To apply to the whole table, which plays only while Table Speed is above 0. Osc n Table Data is the editor's own storage; "
+    + "overwrites the patch number the synth shows for good, and is allowed only right after Push patch (greyed and refused otherwise). Patch Action (None, Pull patch, Push patch, Store patch) presses those buttons and goes back to None by itself. Each waveform table is the parameters Osc n Step 00 to Osc n Step 64 (one per cell of the synth's table, "
+    + "value DATA1 * 256 + DATA2; 65280 = End, 65024 + t = Loop to step t; the device guide explains a step): read them to see a table, write them to change it. "
+    + "A table plays only while Table Speed is above 0. Osc n Table Data only carries a table from an older editor into the Step parameters; "
     + "Osc n Table Clear empties the table and sets Table Speed to 0, so never choose it unless the user asks. Parameters with the values hidden/shown only show or hide panels and do not change the sound. The patch name is Name 1 to Name 10 "
     + "as ASCII codes and names the device in Live. A short guide to the synth and this editor (signal path, oscillators, tables, filter, LFOs, "
     + "patches, what the synth cannot do) is embedded in the device as " + GUIDE + ".";

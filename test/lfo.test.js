@@ -14,7 +14,7 @@ function loadLfo() {
     Date: { now: () => now }, Task: class { constructor(fn) { this.fn = fn; } schedule() {} cancel() {} } };
   const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.lfo.js"), "utf8").replace(/^inlets = 1;\noutlets = 2;\n/m, "");
   const r = new Function(...Object.keys(g), src + "\nreturn { lfo, arm, sendall, quiet };")(...Object.values(g));
-  for (let n = 1; n <= 4; n++) for (const d of SidParams.LFO) r.lfo(n, d.key, d.init);   // Live's restore on load: the starting point
+  for (let n = 1; n <= 4; n++) for (const d of SidParams.LFO) r.lfo(n, d.key, SidParams.initOf(d, n));   // Live's restore on load: the starting point
   out.length = 0;
   return { r, out, tick: (ms) => (now += ms) };
 }

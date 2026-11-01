@@ -15,7 +15,7 @@ function loadWidget() {
     messagename: "", Task: class { constructor(fn) { this.fn = fn; this.running = false; } repeat() { this.running = true; } cancel() { this.running = false; } schedule() {} } };
   const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.table.js"), "utf8")
     .replace(/^inlets = 1;\noutlets = 1;\n/m, "").replace("const born = Date.now();", "const born = 0;");
-  const fn = new Function(...Object.keys(g), src + "\nreturn { geom, paint, onclick, ondrag, bytes, bang, encode, clear, loopmode, note, tick, rate, speed: (v) => { messagename = 'speed'; anything(v); }, get play() { return play; }, get running() { return ticker.running; }, get n() { return n; }, get term() { return term; }, get steps() { return steps; }, push, get cursor() { return cursor; }, setvalueof, getvalueof };");
+  const fn = new Function(...Object.keys(g), src + "\nreturn { geom, paint, onclick, ondrag, bytes, bang, encode, clear, loopmode, note, tick, rate, speed: (v) => { messagename = 'speed'; anything(v); }, get play() { return play; }, get running() { return ticker.running; }, get n() { return n; }, get term() { return term; }, get steps() { return steps; }, push, get cursor() { return cursor; }, setvalueof, getvalueof, cell, get cells() { return cells; }, migrate: () => migrate.fn() };");
   return { w: fn(...Object.values(g)), out, logs, inks, notified };
 }
 const last = (out) => out.filter((s) => s.startsWith("bytes")).pop();
@@ -205,18 +205,38 @@ test("a new device writes no knob and no bank (each is an undo step in Live), an
   assert.deepEqual(out.filter((s) => /^(knob|bank)/.test(s)), []);
 });
 
-test("Live's restore (load, undo, redo) is not told back to Live and moves no knob; an edit tells Live once, an unchanged table not at all", () => {
-  const { w, out, notified } = loadWidget();
+test("the Step parameters are the table: a restore (load, undo, redo, a program) is shown and sent, never written back; an edit writes only the cells it changes", () => {
+  const { w, out } = loadWidget();
   restore(w);
-  w.setvalueof(1, 2, 0x10, 0x3c, 0x20, 0xff, 0xff);                         // Live restores a stored table
+  w.cell(0, 0x103c); w.cell(1, 0x20ff); w.cell(2, 0xff00);                  // Live restores the cells (or an undo, or a program writes them)
   assert.equal(w.n, 2);
-  assert.equal(notified.length, 0, "a restore is no change of ours: no new undo step");
-  assert.deepEqual(out.filter((s) => /^knob/.test(s)), [], "no knob written (each write is an undo step)");
+  assert.deepEqual(out.filter((s) => /^(cell|knob)/.test(s)), [], "a restore writes no cell and no knob (each write is an undo step)");
   assert.equal(last(out), "bytes 16 60 32 255 255", "the restored table still goes to the synth's router");
+  out.length = 0;
+  w.push("len", 3);                                                         // cell 2 becomes a step, cell 3 the End
+  assert.deepEqual(out.filter((s) => /^cell/.test(s)), ["cell 2 4351", "cell 3 65280"]);
+  out.length = 0;
   w.push("len", 3);
-  assert.equal(notified.length, 1, "an edit is one change of the stored table");
-  w.push("len", 3);
-  assert.equal(notified.length, 1, "the same table again: nothing to tell Live");
+  assert.deepEqual(out.filter((s) => /^cell/.test(s)), [], "the same table again: nothing written");
+  w.push("len", 1);                                                         // shorter: only the End moves; step 1 stays in its cell
+  assert.deepEqual(out.filter((s) => /^cell/.test(s)), ["cell 1 65280"]);
+  w.cell(1, 0x20ff);                                                        // an undo puts step 1 back: the table is 3 long again (End in 3)
+  assert.equal(w.n, 3);
+});
+
+test("a table from an older editor (the blob, format 1) moves into the Step parameters once; a new device writes nothing", () => {
+  const { w, out, notified } = loadWidget();
+  w.setvalueof(1, 2, 0x10, 0x3c, 0x20, 0xff, 0xff);
+  w.migrate();
+  assert.deepEqual(out.filter((s) => /^cell/.test(s)), ["cell 0 4156", "cell 1 8447", "cell 2 65280"]);
+  assert.equal(notified.length, 1); assert.deepEqual(w.getvalueof(), [2]);
+  const b = loadWidget();
+  b.w.migrate();
+  assert.deepEqual(b.out.filter((s) => /^cell/.test(s)), []); assert.equal(b.notified.length, 0);
+  const c = loadWidget();                                                   // the cells already hold a table: the old one is left
+  c.w.cell(0, 0x103c); c.w.cell(1, 0xff00);
+  c.w.setvalueof(1, 2, 0x10, 0x3c, 0x20, 0xff, 0xff); c.w.migrate();
+  assert.deepEqual(c.out.filter((s) => /^cell/.test(s)), []);
 });
 
 test("push: Length grows and shrinks the table, keeps Loop below 65 and clamps the cursor's edits to the table", () => {

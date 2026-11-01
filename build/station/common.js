@@ -3,6 +3,7 @@
 // --- sizes (relative to the osc panel's left edge) ---------------------------------------
 const A = require("../amxd");
 const L = require("../../lib/layout");
+const P = require("../../lib/params");
 
 const PAD = 8, GAP = L.LAYOUT_GAP, FRAME_Y = 3, FRAME_H = 163, DIAL = [44, 48];
 const COL_W = 52;                                              // the button column: number + fold buttons, Active/Sync/Ring/Filter
@@ -40,9 +41,9 @@ const UNIT = { int: 0, semitones: 7, note: 8 };
 // 3 behaved the same. So the knobs are ordinary automated parameters (0) for now: Live then follows a value the patcher gives the
 // knob, at the price of 24 entries in the automation list.
 const PUSH_VISIBLE = 0;
-function valueof(d, longPrefix) {
+function valueof(d, longPrefix, n = 1) {   // n: the oscillator or LFO, for a start value per instance (P.initOf)
   // d.push: the name Push shows, where it differs from the label in the device (a name Push has images for)
-  const vo = { parameter_longname: longPrefix + d.name, parameter_shortname: d.push || d.short, parameter_modmode: 0, parameter_initial_enable: 1, parameter_initial: [d.init] };
+  const vo = { parameter_longname: longPrefix + d.name, parameter_shortname: d.push || d.short, parameter_modmode: 0, parameter_initial_enable: 1, parameter_initial: [P.initOf(d, n)] };
   if (d.unit === "enum") Object.assign(vo, { parameter_type: 2, parameter_enum: d.labels, parameter_mmax: d.labels.length - 1 });
   else if (d.unit === "bool") Object.assign(vo, { parameter_type: 2, parameter_enum: ["off", "on"], parameter_mmax: 1 });
   else Object.assign(vo, { parameter_type: 1, parameter_mmin: d.min, parameter_mmax: d.max, parameter_unitstyle: UNIT[d.unit] });
@@ -66,10 +67,10 @@ const shifted = (rect, dx, dy) => [rect[0] + dx, rect[1] + dy, rect[2], rect[3]]
 // Momentary live.text (mode 0) like Live's own buttons; its output goes through [route bang] + [sel 1] so that either a bang or a 1
 // triggers (sel 1 alone did not fire in Live): flat, follows the theme (textbutton drew a gradient).
 // Hidden from automation and not stored (parameter_invisible 2): it only triggers.
-function actionButton(boxId, rect, pres, longname, text, varname) {
+function actionButton(boxId, rect, pres, longname, text, varname, mode = 0) {   // mode 1: a toggle the patcher turns off ("set 0")
   return live(boxId, "live.text", rect, pres, { parameter_longname: longname, parameter_shortname: text, parameter_type: 2,
     parameter_enum: ["off", "on"], parameter_mmax: 1, parameter_invisible: 2, parameter_modmode: 0 },
-    { text, texton: text, mode: 0, fontsize: 9 }, varname);
+    { text, texton: text, mode, fontsize: 9 }, varname);
 }
 
 module.exports = { PUSH_VISIBLE, UNIT, PAD, GAP, FRAME_Y, FRAME_H, DIAL, COL_W, VOICE_GAP, COL_PW, INNER_Y, INNER_H, FCOL_W, ENV_DIAL_Y, TITLE_Y, SUB_Y, CONTENT_Y, DEVICE_H, voiceFrameItem, live, valueof, v8ui, plain, SHADE, frameBox, voiceFrame, titleBox, shifted, actionButton };
