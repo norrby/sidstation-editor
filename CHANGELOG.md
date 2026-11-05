@@ -7,6 +7,8 @@ All notable changes to SidStation Editor are listed here, newest first. The form
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-05
+
 ### Added
 
 - **Connect and Synth OS**: Connect asks the synth which OS it runs and sets Synth OS (OS <= 1.11,
@@ -15,6 +17,9 @@ All notable changes to SidStation Editor are listed here, newest first. The form
   with no reply Synth OS is set to OS <= 1.11 and the editor says the synth may also be off or not
   connected. Patch Action has Connect as a fifth choice. Synth OS changes nothing yet.
 - **A logo** top left.
+- **A device guide** (docs/device-guide.md): a short text on the synth and the editor, from the
+  signal path to what the synth cannot do, with the Live parameter names. It is embedded in the
+  device file, and the device description names it, so a program driving the editor can read it.
 
 ### Changed
 
@@ -22,22 +27,6 @@ All notable changes to SidStation Editor are listed here, newest first. The form
   in two columns: Synth OS on the left, Connect, Pull, Push and Store patch on the right.
 - **The overview**: a speaker, as Max for Live draws the output, replaces "out" right of where the
   outputs meet under the filter, and the diagram is centred in its panel. The patch name's dots look centred in their display.
-
-### Fixed
-
-- **Editing the patch name** no longer adds a quote: a name with a blank in it came into the text
-  field in quotes, and the quote became part of the name on Return.
-
-## [1.0.0] - 2026-11-01
-
-### Added
-
-- **A device guide** (docs/device-guide.md): a short text on the synth and the editor, from the
-  signal path to what the synth cannot do, with the Live parameter names. It is embedded in the
-  device file, and the device description names it, so a program driving the editor can read it.
-
-### Changed
-
 - **The waveform tables are Live parameters**: one per cell of the synth's table, "Osc n Step 00" to
   "Osc n Step 64" (value DATA1 × 256 + DATA2, as the synth stores it). A program driving the editor
   through Live's API can now read and write the tables, and every table edit is ordinary Live undo.
@@ -91,6 +80,8 @@ All notable changes to SidStation Editor are listed here, newest first. The form
 
 ### Fixed
 
+- **Editing the patch name** no longer adds a quote: a name with a blank in it came into the text
+  field in quotes, and the quote became part of the name on Return.
 - **Attack, Decay and Release reach the synth while Gate is on.** Gate greyed the three dials by
   switching them off, and a switched-off dial in Max holds back the values that automation, Push or
   a program set, so the synth (and Push patch, and Store) got the old ones until Gate went off. Now
