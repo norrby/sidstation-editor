@@ -28,12 +28,12 @@ outlets = 2;   // 0: the switches, 1: "tip …" to the tooltip layer (sid.tip.js
 // it was too heavy next to the dot letters, 18 px too small: now as tall as the diagram's other boxes (22 px),
 // centred on the name display (NAME_RECT y 7..33 here), as wide as the filter. The filter moved right (and 4 px narrower, "out"
 // must fit) to give the switches' wires room.
-// The out bus joins under the filter (the filter 14 px shorter for it) and "out" stands right of the joint, only a little past the
-// filter's right edge; the whole diagram is moved DX to the right (as much room left of the Sync arrow as right of the filter) and
+// The out bus joins under the filter (the filter 14 px shorter for it) and a speaker (the output) stands right of the joint, within
+// the filter's width; the whole diagram is moved DX to the right (as much room left of the Sync arrow as right of the filter) and
 // DY down, the name display with it (overview.js NAME_RECT).
 const DX = 12, DY = 3;
 const G = { rows: [51 + DY, 91 + DY, 131 + DY], boxH: 22, osc: [26 + DX, 66 + DX], env: [76 + DX, 110 + DX], pivot: 122 + DX, bus: 153 + DX, filt: [166 + DX, 200 + DX],
-  filtY: [40 + DY, 136 + DY], fenv: [166 + DX, 200 + DX], fenvY: 20 + DY, fenvH: 22, outY: 144 + DY,
+  filtY: [40 + DY, 136 + DY], fenv: [166 + DX, 200 + DX], fenvY: 20 + DY, fenvH: 22, outY: 147 + DY,
   laneSync: 40 + DX, laneRing: 52 + DX, wrapSync: 8 + DX, wrapRing: 16 + DX };
 // boxFill: unlit boxes are filled dark like Live's unlit buttons, not hollow.
 const C = { box: [1, 1, 1, 0.35], boxFill: [0.07, 0.07, 0.07, 0.6], boxOn: UI.lit, text: [1, 1, 1, 0.8], textOn: UI.dark, off: [1, 1, 1, 0.25],
@@ -104,6 +104,14 @@ function drawSwitch(y, on, three, off) {
   g.ellipse(px - 2, y - 2, 4, 4); g.fill();                                // the pivot
   g.ellipse(t[0] - 1.6, t[1] - 1.6, 3.2, 3.2); g.fill();                   // the contact point on the leaf
 }
+// The output as Max for Live draws it (ezdac's icon): a speaker, its cone to the right, two sound waves; x = its left edge, y = its middle.
+function speaker(x, y) {
+  const g = mgraphics;
+  g.rectangle(x, y - 2, 2.5, 4); g.fill();
+  g.move_to(x + 2.5, y - 2); g.line_to(x + 6, y - 4.5); g.line_to(x + 6, y + 4.5); g.line_to(x + 2.5, y + 2); g.close_path(); g.fill();
+  g.set_line_width(1);
+  for (const r of [2.5, 5]) { g.move_to(x + 6 + r * Math.cos(-0.8), y + r * Math.sin(-0.8)); g.arc(x + 6, y, r, -0.8, 0.8); g.stroke(); }
+}
 function lane(on, col, ok) { ink(ok === false ? C.envOff : on ? col : C.off); mgraphics.set_line_width(on && ok !== false ? 2 : 1); }
 
 function paint() {
@@ -125,7 +133,7 @@ function paint() {
   drawBox(G.fenv[0], G.fenv[1], G.fenvY, "Env", filterEnv === 1, false, G.fenvH);
   const fx = (G.fenv[0] + G.fenv[1]) / 2;
   ink(C.wire); mgraphics.move_to(fx, G.fenvY + G.fenvH / 2); mgraphics.line_to(fx, G.filtY[0] - 1); mgraphics.stroke(); head(fx, G.filtY[0] - 1, 0, 1);
-  ink(C.text); mgraphics.move_to(ox + 6, G.outY + 3); mgraphics.show_text("out");
+  ink(C.text); speaker(ox + 6, G.outY);
   for (let i = 0; i < 3; i++) {
     const y = G.rows[i];
     greyNow = silent(i);

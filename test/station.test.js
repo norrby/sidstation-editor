@@ -23,7 +23,7 @@ function loadFilter() {
 function loadUi(file, size, extra, automated = () => false) {
   const out = [];
   const mg = { size, init() {}, redraw() {}, text_measure: () => [8, 9] };
-  for (const f of ["set_source_rgba", "rectangle", "fill", "set_line_width", "move_to", "line_to", "stroke", "ellipse", "select_font_face", "set_font_size", "show_text", "arc", "curve_to"]) mg[f] = () => {};
+  for (const f of ["set_source_rgba", "rectangle", "fill", "set_line_width", "move_to", "line_to", "stroke", "ellipse", "select_font_face", "set_font_size", "show_text", "arc", "curve_to", "close_path"]) mg[f] = () => {};
   const rects = []; let ink = null;                                     // every rectangle with the colour it was drawn in
   mg.set_source_rgba = (...a) => { ink = [].concat(...a); }; mg.rectangle = (x, y, w, h) => rects.push({ x, y, ink });
   let t = 0;

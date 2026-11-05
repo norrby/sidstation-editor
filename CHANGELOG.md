@@ -20,8 +20,8 @@ All notable changes to SidStation Editor are listed here, newest first. The form
 
 - **The patch column**: Poly, Legato and HCut side by side below the logo, and the buttons below them
   in two columns: Synth OS on the left, Connect, Pull, Push and Store patch on the right.
-- **The overview**: "out" sits right of where the outputs meet under the filter, and the diagram is
-  centred in its panel. The patch name's dots look centred in their display.
+- **The overview**: a speaker, as Max for Live draws the output, replaces "out" right of where the
+  outputs meet under the filter, and the diagram is centred in its panel. The patch name's dots look centred in their display.
 
 ### Fixed
 
