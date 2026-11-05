@@ -1,12 +1,25 @@
-// overview.js – the overview: the diagram (sid.map.js), the patch name and the patch column (Poly/Legato/HCut, Pull/Push/Store).
+// overview.js – the overview: the Synth column (Connect, Synth OS), the patch column (Poly/Legato/HCut, Pull/Push/Store), the diagram
+// (sid.map.js) and the patch name.
 const A = require("../amxd");
 const P = require("../../lib/params");
+const { SYNTH_OS } = require("../../lib/sysex");
 const { PAD, FRAME_Y, FRAME_H, INNER_Y, INNER_H, DEVICE_H, live, valueof, v8ui, SHADE, frameBox, voiceFrame, shifted, actionButton, DIAL } = require("./common");
 const { FILTER_BTN } = require("./voice");
 
 const MAP_W = 230;
 const PCOL_BTN = 60;                                           // the Patch column's button width: "Send patch" was clipped at 52 px
-const PCOL_W = PAD + PCOL_BTN;                                    // the Patch column on the left of the overview box
+// Two columns left of the diagram. At the top the sound's settings on a tongue that joins them to the diagram: Poly and Legato
+// on the left, HCut on the right. Below it a grid of buttons, rows of BTN_H every ROW px, ending at the frame's bottom: on the
+// left the synth (Connect, Synth OS), on the right the patch (Pull, Push, Store).
+const LOGO_RECT = [PAD, 4, 124, 32];                            // the logo (sid.logo.js) top left; the tongue and the buttons below it
+const SCOL_W = PAD + PCOL_BTN + 4;
+const COLX = SCOL_W + PAD;                                       // the right column
+const PCOL_W = COLX + PCOL_BTN;                                  // both columns, on the left of the overview box
+const BTN_H = 15, ROW = 18, ROW0 = 165 - 4 * ROW + (ROW - BTN_H);  // four rows, the last ending at 165
+const TY = 34;                                                   // the tongue, below the logo
+const btnRow = (i) => ROW0 + i * ROW;
+const CONNECT_RECT = [PAD, btnRow(0), PCOL_BTN, BTN_H];
+const SYNTHOS_RECT = [PAD, btnRow(1), PCOL_BTN, 3 * ROW - (ROW - BTN_H)];   // three tab rows of BTN_H, 3 px apart
 const MAP_TOTAL = PCOL_W + MAP_W;                              // the overview box: Patch column + the diagram
 const NAME_RECT = [PCOL_W + 10, FRAME_Y + 7, 144, 26];         // the name display top left in the diagram, above Osc 1 (the Env box sits above the filter), inside MAP_INNER
 // The overview like the voices: the Patch column on the
@@ -23,16 +36,17 @@ const MAP_INNER = [PCOL_W + 6, INNER_Y, MAP_W - 10, INNER_H];         // 3 px cl
 // The diagram's rows moved to 51/91/131 (the filter longer, Osc 1 level with its top).
 // Poly, Legato and HCut together at the top in a tongue from the overview's frame, so they read as part of the sound;
 // Pull/Push/Store outside it at the bottom.
-const CPRES = { poly: ["live.text", [PAD, 10, PCOL_BTN, 18]], legato: ["live.text", [PAD, 32, PCOL_BTN, 18]], hcut: ["live.dial", [PAD + (PCOL_BTN - 44) / 2, 54]] };
-const PATCH_TONGUE = { x: 3, y: 8, h: 96 };                     // round Poly..HCut (the dial ends at 102)
+const CPRES = { poly: ["live.text", [PAD, TY + 10, PCOL_BTN, 18]], legato: ["live.text", [PAD, TY + 32, PCOL_BTN, 18]], hcut: ["live.dial", [COLX + (PCOL_BTN - 44) / 2, TY + 6]] };
+const PATCH_TONGUE = { x: 3, y: TY + 8, h: 48 };                // round Poly, Legato and HCut (the dial ends 54 below TY)
 // The patch buttons stacked in full width, 15 px high: two half-width buttons clipped the text to "Sen"/"Fet..".
 // Fetch ("Pull patch") reads the current slot.
-const FETCH_RECT = [PAD, 116, PCOL_BTN, 15];                   // Pull, Push, Store at the bottom
-const SENDALL_RECT = [PAD, 133, PCOL_BTN, 15];
-const STORE_RECT = [PAD, 150, PCOL_BTN, 15];                   // Store below Push
+const FETCH_RECT = [COLX, btnRow(1), PCOL_BTN, BTN_H];             // Pull, Push, Store level with the three Synth OS rows
+const SENDALL_RECT = [COLX, btnRow(2), PCOL_BTN, BTN_H];
+const STORE_RECT = [COLX, btnRow(3), PCOL_BTN, BTN_H];
 const SENDALL_TEXT = "Push patch";
 const STORE_TEXT = "Store patch";
 const FETCH_TEXT = "Pull patch";
+const CONNECT_TEXT = "Connect";
 const ACTION_LONG = "Patch Action";                           // the parameter that triggers Pull/Push/Store from Live (API, mapping, automation)
 // Produces the overview panel's items for the column (x relative to the overview box's left edge).
 function patchColumn(x0, ctx) {
@@ -91,6 +105,22 @@ function patchColumn(x0, ctx) {
   lines.push(A.line(vStore, 0, vStoreSel, 0), A.line(vStoreSel, 0, vStoreMsg, 0), A.line(vStoreSel, 1, vStoreSel1, 0), A.line(vStoreSel1, 0, vStoreMsg, 0),
     A.line(vStoreMsg, 0, vFilter, 0));
   items.push({ name: "c_store", rect: STORE_RECT });
+  // Connect (sid.connect.js): 06 + 08 to the gateway; the answer sets Synth OS. Synth OS: a stored parameter (no undo steps, in no
+  // bank) the user can also set by hand; its choices only grow at the end (SYNTH_OS), since sets store the index.
+  const vConnect = id(), vConnSel = id(), vConnSel1 = id(), vConnMsg = id(), vConn = id(), vOs = id();
+  boxes.push(actionButton(vConnect, [3600, 2500, 60, 15], px(CONNECT_RECT), "Connect", CONNECT_TEXT, "c_connect"),
+    A.obj(vConnSel, "route bang", [3600, 2520, 60, 20]), A.obj(vConnSel1, "sel 1", [3660, 2520, 40, 20]), A.msg(vConnMsg, "connect", [3600, 2545, 50, 20]),
+    A.obj(vConn, "v8 sid.connect.js", [3600, 2575, 110, 20], 3, ["", "", ""], { varname: "connect" }),
+    live(vOs, "live.tab", [3600, 2610, 60, 49], px(SYNTHOS_RECT), { parameter_longname: "Synth OS", parameter_shortname: "Synth OS",
+      parameter_type: 2, parameter_enum: SYNTH_OS, parameter_mmax: SYNTH_OS.length - 1, parameter_modmode: 0,
+      parameter_initial_enable: 1, parameter_initial: [0], parameter_visible_undoable: 0 },
+    { mode: 0, num_lines_patching: SYNTH_OS.length, num_lines_presentation: SYNTH_OS.length, spacing_y: ROW - BTN_H, fontsize: 9 }, "c_synthos"));
+  lines.push(A.line(vConnect, 0, vConnSel, 0), A.line(vConnSel, 0, vConnMsg, 0), A.line(vConnSel, 1, vConnSel1, 0), A.line(vConnSel1, 0, vConnMsg, 0),
+    A.line(vConnMsg, 0, vConn, 0), A.line(vConn, 0, vOs, 0));
+  ctx.connectId = vConn;
+  boxes.push({ box: { ...v8ui(id(), "sid.logo.js", [3800, 2500, 124, 32], px(LOGO_RECT), "c_logo").box, ignoreclick: 1 } });
+  items.push({ name: "c_logo", rect: LOGO_RECT });
+  items.push({ name: "c_connect", rect: CONNECT_RECT }, { name: "c_synthos", rect: SYNTHOS_RECT });
   // Patch Action: the same three actions as a Live parameter, for automation, MIDI mapping and Live's API (the buttons themselves
   // are hidden from Live, see actionButton). A quantized parameter None | Pull patch | Push patch | Store patch, off screen and off
   // Push (in no bank): a value 1-3 -> [sel 0] (None passes nothing) -> [t b i]: the action first (right outlet -> [sel 1 2 3] ->
@@ -100,13 +130,13 @@ function patchColumn(x0, ctx) {
   // None for a new device; no undo steps.
   const vAct = id(), vActSel0 = id(), vActT = id(), vActSel = id(), vActZero = id(), vActDelay = id();
   boxes.push(live(vAct, "live.menu", [3500, 2500, 100, 15], null, { parameter_longname: ACTION_LONG, parameter_shortname: "Action",
-      parameter_type: 2, parameter_enum: ["None", FETCH_TEXT, SENDALL_TEXT, STORE_TEXT], parameter_mmax: 3, parameter_invisible: 0,
+      parameter_type: 2, parameter_enum: ["None", FETCH_TEXT, SENDALL_TEXT, STORE_TEXT, CONNECT_TEXT], parameter_mmax: 4, parameter_invisible: 0,
       parameter_modmode: 0, parameter_initial_enable: 1, parameter_initial: [0], parameter_visible_undoable: 0 }, {}, "c_action"),
     A.obj(vActSel0, "sel 0", [3500, 2520, 40, 20], 2, ["bang", ""]), A.obj(vActT, "t b i", [3500, 2545, 40, 20], 2, ["bang", "int"]),
-    A.obj(vActSel, "sel 1 2 3", [3560, 2570, 70, 20], 4, ["bang", "bang", "bang", ""]), A.obj(vActDelay, "delay 50", [3500, 2570, 50, 20], 1, ["bang"]),
+    A.obj(vActSel, "sel 1 2 3 4", [3560, 2570, 80, 20], 5, ["bang", "bang", "bang", "bang", ""]), A.obj(vActDelay, "delay 50", [3500, 2570, 50, 20], 1, ["bang"]),
     A.msg(vActZero, "0", [3500, 2595, 30, 20]));
   lines.push(A.line(vAct, 0, vActSel0, 0), A.line(vActSel0, 1, vActT, 0), A.line(vActT, 1, vActSel, 0), A.line(vActT, 0, vActDelay, 0),
-    A.line(vActDelay, 0, vActZero, 0), A.line(vActZero, 0, vAct, 0), A.line(vActSel, 0, vFetchMsg, 0), A.line(vActSel, 1, vMsg, 0), A.line(vActSel, 2, vStoreMsg, 0));
+    A.line(vActDelay, 0, vActZero, 0), A.line(vActZero, 0, vAct, 0), A.line(vActSel, 0, vFetchMsg, 0), A.line(vActSel, 1, vMsg, 0), A.line(vActSel, 2, vStoreMsg, 0), A.line(vActSel, 3, vConnMsg, 0));
   return items;
 }
 

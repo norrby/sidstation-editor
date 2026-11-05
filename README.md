@@ -48,10 +48,13 @@ Not affiliated with or endorsed by Elektron. Use at your own risk.
   store support (see below). With the stock OS the synth does not answer, and the editor shows
   **NO REPLY**.
 - Every value is a Live parameter: automation, MIDI mapping and presets work as usual.
-- **Patch Action** is a Live parameter (not on screen) with the choices None, Pull patch, Push patch
-  and Store patch: setting it from automation, a MIDI mapping or Live's API does that action and
-  returns it to None.
-  Map a button to it, not a knob: a knob sweeping through the choices does all three.
+- **Connect** asks the synth which OS it runs and sets **Synth OS** (OS <= 1.11, 1.12 R01,
+  1.12 R02), which you can also set by hand. With no reply it is set to OS <= 1.11: Elektron's own
+  OS does not answer, but the synth may also be off or not connected.
+- **Patch Action** is a Live parameter (not on screen) with the choices None, Pull patch, Push patch,
+  Store patch and Connect: setting it from automation, a MIDI mapping or Live's API does that action
+  and returns it to None.
+  Map a button to it, not a knob: a knob sweeping through the choices does them all.
 - Every parameter has a help text in Live's Info View, also those with no control on screen, and
   the device description tells a program driving the editor through Live's API how to behave:
   edits reach the synth at once, and Pull, Push and Store patch are never chosen unless asked.

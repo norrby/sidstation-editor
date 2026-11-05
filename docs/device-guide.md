@@ -68,8 +68,9 @@ The editor edits the synth's edit buffer, never patch memory directly.
 - **Pull patch** reads the patch the synth's display shows into the editor.
 - **Store patch** writes the edit buffer to the patch number the display shows, overwriting it for good. It saves what the synth has, so Push patch first when the editor's sound is the one to keep.
 - **Patch Number** selects one of the synth's patches P00–P99 by program change.
+- **Connect** asks the synth which OS it runs and sets `Synth OS` (OS <= 1.11, 1.12 R01, 1.12 R02). No reply sets OS <= 1.11: Elektron's own OS does not answer, but the synth may also be off or not connected.
 
-These are `Patch Action` (None, Pull patch, Push patch, Store patch) and `Patch Number`. Both are ask-first: change them only when the user asks. Never choose Store unless the user explicitly asks to store.
+These are `Patch Action` (None, Pull patch, Push patch, Store patch, Connect) and `Patch Number`. Both are ask-first: change them only when the user asks. Never choose Store unless the user explicitly asks to store.
 
 Pull and Store need a modified firmware that answers dump requests. With the stock OS the synth does not answer, and the editor shows NO REPLY.
 

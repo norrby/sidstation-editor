@@ -9,7 +9,8 @@
 //     accepts AND that are in the params.js whitelist (dpRows),
 //     channel messages with the right length and 7-bit data, and the dump request (id 05,
 //     validateRequestFrame: exactly 9 bytes, slot 0..99 or 7F; only for a firmware with
-//     dump-request support); with that firmware also the settings request (06, validateSettingsFrame) and store (07 7F, validateStoreFrame).
+//     dump-request support); with that firmware also the settings request (06, validateSettingsFrame) and store (07 7F, validateStoreFrame),
+//     and the version request (08, validateVersionFrame), which every OS without it ignores.
 //  2. One message at a time, never interleaved, in arrival order: everything goes into ONE queue. Channel messages and DP
 //     frames go out at once; only a patch frame (150 ms for the synth to store it) and a request (10 ms) are followed by a
 //     pause, during which later messages wait in the queue. Nothing is paced to the MIDI cable: what the cable cannot carry
@@ -26,8 +27,8 @@
 // [v8 sid.send.js] outlet 0 -> [midiout]. Outlet 1: "status <text>". Messages (from the patcher only: the device has no network port):
 //   frame <bytes…>  a complete message from a router; validated as above
 //   stored <status> <slot> <size> <sum> <free>        the 47 reply (from the capture): ends the store lock
-//   replied dump|settings                             a 02/03 dump or a 46 reply came in (from the capture)
-// Every request that expects an answer is timed (Live can lose its input port, and Pull then just does nothing): 05 -> a dump, 06 -> 46, 07 -> 47. No answer within 3 s: a log line and
+//   replied dump|settings|version                     a 02/03 dump, a 46 or a 48 reply came in (from the capture)
+// Every request that expects an answer is timed (Live can lose its input port, and Pull then just does nothing): 05 -> a dump, 06 -> 46, 07 -> 47, 08 -> 48. No answer within 3 s: a log line and
 // "noreply <dump|settings|store>" on outlet 1, and "sent" after every router frame (the name display shows NO REPLY until "answered" – any reply – or a click).
 
 inlets = 1;
@@ -40,7 +41,8 @@ let storing = null;                          // the store lock: the Task that ti
 const STORE_TIMEOUT_MS = 3000;
 const DP_ROWS = SidParams.dpRows();          // the DP whitelist, built once
 const REPLY_TIMEOUT_MS = 3000;
-const waiting = { dump: null, settings: null };   // the Tasks that time out a 05 / 06 request, or null
+const waiting = { dump: null, settings: null, version: null };   // the Tasks that time out a 05 / 06 / 08 request, or null
+const REQUEST_NAME = { dump: "dump request", settings: "settings request", version: "version request" };
 
 // --- the queue ------------------------------------------------------------------
 
@@ -51,7 +53,7 @@ function enqueue(m) {
 
 function pace(m) {                                           // the pause after a message, 0 = none
   if (m[0] !== 0xf0 || m[6] === ID_DP) return 0;             // channel message, DP: the next one at once
-  if (m[6] === ID_REQUEST || m[6] === ID_SETTINGS || m[6] === ID_STORE) return 10;   // DP/requests: short pause
+  if (m[6] === ID_REQUEST || m[6] === ID_SETTINGS || m[6] === ID_STORE || m[6] === ID_VERSION) return 10;   // DP/requests: short pause
   return Math.round(m.length * 0.32) + GAP_MS;                // patch frame: wire time + storing
 }
 
@@ -74,6 +76,7 @@ function drainOne() {
     if (m[0] === 0xf0 && m[6] === ID_STORE) lockStore();
     if (m[0] === 0xf0 && m[6] === ID_REQUEST) expectReply("dump");
     if (m[0] === 0xf0 && m[6] === ID_SETTINGS) expectReply("settings");
+    if (m[0] === 0xf0 && m[6] === ID_VERSION) expectReply("version");
     if (SID_DEV) tally(m);                                   // after the lock: a throw here must not leave a sent store unlocked
     const ms = pace(m);
     if (ms) { task.schedule(ms); return; }
@@ -87,7 +90,7 @@ function drainOne() {
 const sent = {}; let sentTask = null;
 function tally(m) {
   const k = m[0] !== 0xf0 ? ((m[0] & 0xf0) === 0xb0 ? "CC" : TYPE[m[0] & 0xf0] || "channel")
-    : m[6] === ID_DP ? "DP" : m[6] === ID_REQUEST ? "dump request" : m[6] === ID_SETTINGS ? "settings request" : m[6] === ID_STORE ? "store" : "patch frame";
+    : m[6] === ID_DP ? "DP" : m[6] === ID_REQUEST ? "dump request" : m[6] === ID_SETTINGS ? "settings request" : m[6] === ID_STORE ? "store" : m[6] === ID_VERSION ? "version request" : "patch frame";
   sent[k] = (sent[k] || 0) + 1;
   if (!sentTask) {
     sentTask = new Task(() => { sentTask = null; sidlog("send", "sent last second: " + Object.keys(sent).map((k) => sent[k] + " " + k).join(", ") + ", " + queue.length + " queued"); for (const k of Object.keys(sent)) delete sent[k]; });
@@ -108,6 +111,7 @@ function validate(m) {
     case ID_REQUEST: return validateRequestFrame(m);
     case ID_SETTINGS: return validateSettingsFrame(m);
     case ID_STORE: return validateStoreFrame(m);
+    case ID_VERSION: return validateVersionFrame(m);
     default: return validateFrame(m);
   }
 }
@@ -142,8 +146,9 @@ function stored(st, slot, size, sum, free) {
 
 function expectReply(what) {
   if (waiting[what]) waiting[what].cancel();                 // a new request restarts the wait
-  waiting[what] = new Task(() => { waiting[what] = null; noReply(what, (what === "dump" ? "dump request" : "settings request") + ": NO REPLY within " + REPLY_TIMEOUT_MS +
-    " ms – is the synth on, running a firmware with dump-request support, and its MIDI Out reaching this track? (If the MIDI interface's input light blinks but nothing arrives, restart Live.)"); });
+  waiting[what] = new Task(() => { waiting[what] = null; noReply(what, REQUEST_NAME[what] + ": NO REPLY within " + REPLY_TIMEOUT_MS + (what === "version"
+    ? " ms (expected with OS 1.12 R01 and Elektron's OS, which do not answer it)"
+    : " ms – is the synth on, running a firmware with dump-request support, and its MIDI Out reaching this track? (If the MIDI interface's input light blinks but nothing arrives, restart Live.)")); });
   waiting[what].schedule(REPLY_TIMEOUT_MS);
 }
 function replied(what) { if (waiting[what]) { waiting[what].cancel(); waiting[what] = null; } outlet(1, "answered", what); }

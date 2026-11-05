@@ -274,7 +274,7 @@ test("SidStation: Patch Action is an automated parameter off screen and off Push
   const menu = p.boxes.find((b) => b.box.varname === "c_action"), vo = menu.box.saved_attribute_attributes.valueof;
   assert.equal(menu.box.maxclass, "live.menu");
   assert.equal(vo.parameter_longname, "Patch Action");
-  assert.deepEqual(vo.parameter_enum, ["None", "Pull patch", "Push patch", "Store patch"]);
+  assert.deepEqual(vo.parameter_enum, ["None", "Pull patch", "Push patch", "Store patch", "Connect"], "only appended: sets store the index");
   assert.equal(vo.parameter_invisible, 0, "in Live's parameter list");
   assert.deepEqual([vo.parameter_initial_enable, vo.parameter_initial], [1, [0]], "a new device starts at None");
   assert.ok(!menu.box.presentation, "not on screen");
@@ -284,9 +284,9 @@ test("SidStation: Patch Action is an automated parameter off screen and off Push
   const [t] = from(sel0, 1); assert.equal(text(t), "t b i");
   const [delay] = from(t, 0); assert.equal(text(delay), "delay 50", "the reset in its own event, or Live ignores it");
   const [zero] = from(delay, 0); assert.equal(text(zero), "0"); assert.deepEqual(from(zero, 0), [menu.box.id], "back to None as a value");
-  const [sel] = from(t, 1); assert.equal(text(sel), "sel 1 2 3");
-  const [fetch, push, store] = [0, 1, 2].map((o) => from(sel, o)[0]);
-  assert.deepEqual([text(fetch), text(push), text(store)], ["fetch", "sendall", "store"], "the buttons' own messages");
+  const [sel] = from(t, 1); assert.equal(text(sel), "sel 1 2 3 4");
+  const [fetch, push, store, connect] = [0, 1, 2, 3].map((o) => from(sel, o)[0]);
+  assert.deepEqual([text(fetch), text(push), text(store), text(connect)], ["fetch", "sendall", "store", "connect"], "the buttons' own messages");
 });
 
 test("SidStation: Pull, Push and Store patch are plain buttons; the gateway keeps no state about the synth's sound", () => {
@@ -390,4 +390,23 @@ test("overview: osc 3's Off/Filter rules leave both alone while automation plays
   w.set("route", 3, 1); assert.deepEqual(out.splice(0), [], "Filter from automation: Off is not written");
   playing.clear(); w.set("route", 3, 0); w.set("off3", 3, 1); out.length = 0;
   w.set("route", 3, 1); assert.deepEqual(out.splice(0), ["off3 0"], "no automation: the rule as before");
+});
+
+test("SidStation: Connect and Synth OS – the button to sid.connect.js, which talks through the gateway, hears its replies and sets Synth OS", () => {
+  const p = require("../build/amxd").readAmxd(path.join(__dirname, "..", "dist", NAME + ".amxd")).json.patcher;
+  const box = (id) => (p.boxes.find((b) => b.box.id === id) || { box: {} }).box;
+  const from = (id, outlet) => p.lines.filter((l) => l.patchline.source[0] === id && l.patchline.source[1] === outlet).map((l) => l.patchline.destination[0]);
+  const to = (id) => p.lines.filter((l) => l.patchline.destination[0] === id).map((l) => box(l.patchline.source[0]).text);
+  const byVar = (v) => p.boxes.find((b) => b.box.varname === v).box;
+  const conn = byVar("connect"), os = byVar("c_synthos"), vo = os.saved_attribute_attributes.valueof;
+  assert.equal(conn.text, "v8 sid.connect.js");
+  assert.equal(os.maxclass, "live.tab");
+  assert.deepEqual([vo.parameter_longname, vo.parameter_enum, vo.parameter_initial, vo.parameter_visible_undoable], ["Synth OS", require("../lib/sysex").SYNTH_OS, [0], 0]);
+  for (const b of Object.values(p.parameters.parameterbanks)) assert.ok(!b.parameters.includes("Synth OS"), b.name + ": not on Push");
+  assert.deepEqual(from(conn.id, 0), [os.id], "the choice into Synth OS as a value");
+  assert.deepEqual(from(conn.id, 1), [byVar("gateway").id], "06 and 08 through the gateway");
+  assert.deepEqual(from(conn.id, 2), [byVar("map").id], "the notice in the overview");
+  assert.deepEqual(to(conn.id).sort(), ["connect", "prepend answered", "prepend noreply", "prepend version"]);
+  assert.equal(byVar("c_connect").mode, 0, "momentary");
+  assert.ok(fs.existsSync(path.join(__dirname, "..", "dist", "sid.connect.js")));
 });

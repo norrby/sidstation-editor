@@ -4,8 +4,9 @@
 //
 // Usage: [midiin] -> [v8 sid.capture.js]. Every complete SidStation frame is decoded in the Max console, and a patch dump's
 // bytes go to the log as one line (nothing is saved as a file).
-// Outlet 0: "patch <bytes...>" (decoded raw bytes), "stored …" (a 47 store reply), "replied dump|settings", "settings …" (a 46
-// reply, to the loader only: the patcher routes only stored/replied to the gateway).
+// Outlet 0: "patch <bytes...>" (decoded raw bytes), "stored …" (a 47 store reply), "replied dump|settings|version", "settings …" (a 46
+// reply, to the loader only: the patcher routes only stored/replied to the gateway), "version <major> <minor> <revision>" (a 48 reply,
+// to sid.connect.js).
 
 inlets = 1;
 outlets = 1;
@@ -26,11 +27,11 @@ function finish(frame) {
   }
   // A frame of a kind only we send (DP 04, requests 05/06, store 07) coming IN means our output is looping back to the input:
   // warn and do not pass it on.
-  if (frame[6] === ID_DP || frame[6] === ID_REQUEST || frame[6] === ID_SETTINGS || frame[6] === ID_STORE) {
+  if (frame[6] === ID_DP || frame[6] === ID_REQUEST || frame[6] === ID_SETTINGS || frame[6] === ID_STORE || frame[6] === ID_VERSION) {
     sidlog("capture", "ERROR outgoing-type frame (id " + hex(frame[6]) + ") came in – is the track's output looping back to its input?");
     return;
   }
-  if (frame[6] === ID_SETTINGS_REPLY || frame[6] === ID_STORE_REPLY) { reply(frame); return; }
+  if (frame[6] === ID_SETTINGS_REPLY || frame[6] === ID_STORE_REPLY || frame[6] === ID_VERSION_REPLY) { reply(frame); return; }
   const info = decodeDump(frame);
   sidlog("capture", "dump " + frame.length + " bytes: " + frame.map(hex).join(" "));
   report(frame, info);
@@ -39,10 +40,16 @@ function finish(frame) {
   if (info.patch) { sidlog("capture", "patch '" + info.name + "' -> the editor, " + info.patch.length + " raw bytes"); outlet(0, "patch", ...info.patch); }
 }
 
-// 46/47 replies from our firmware (lib/sysex.js decodeReply): passed on to the loader and (stored) the gateway.
+// 46/47/48 replies from our firmware (lib/sysex.js decodeReply): passed on to the loader, sid.connect.js and the gateway.
 function reply(frame) {
   const r = decodeReply(frame);
   if (!r.ok) { sidlog("capture", "reply ignored:", r.reason); return; }
+  if (r.id === ID_VERSION_REPLY) {
+    sidlog("capture", "version: OS " + r.major + "." + r.minor + " R" + String(r.revision).padStart(2, "0"));
+    outlet(0, "version", r.major, r.minor, r.revision);
+    outlet(0, "replied", "version");
+    return;
+  }
   if (r.id === ID_SETTINGS_REPLY) {
     sidlog("capture", "settings: source " + ["Patch", "Globl", "ExtCl"][r.source] + ", global speed " + r.globalSpeed + " Hz, patch speed " +
       r.patchSpeed + " Hz, period " + r.period + " -> " + r.rateHz.toFixed(1) + " Hz, slot " + r.slot + " (loaded " + r.loaded + "), base ch " + (r.baseCh + 1));

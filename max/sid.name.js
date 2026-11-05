@@ -76,6 +76,7 @@ function glyphOf(code) { const ch = String.fromCharCode(code); return FONT[ch] |
 const WARN_TEXT = "NO REPLY  ";
 let warning = false;
 function noreply(what) {
+  if (what === "version") return;                                          // R01 and Elektron's OS never answer 08: not a fault
   sidlog("name", "NO REPLY shown (" + what + ")");
   if (shownRect) return;                                                   // typing a name: leave the field alone
   warning = true;

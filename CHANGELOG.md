@@ -7,6 +7,20 @@ All notable changes to SidStation Editor are listed here, newest first. The form
 
 ## [Unreleased]
 
+### Added
+
+- **Connect and Synth OS**: Connect asks the synth which OS it runs and sets Synth OS (OS <= 1.11,
+  1.12 R01, 1.12 R02), which can also be set by hand. OS 1.12 R02 and later say their version (the
+  version request, 08); R01 answers only the settings request; Elektron's own OS answers neither, and
+  with no reply Synth OS is set to OS <= 1.11 and the editor says the synth may also be off or not
+  connected. Patch Action has Connect as a fifth choice. Synth OS changes nothing yet.
+- **A logo** top left.
+
+### Changed
+
+- **The patch column**: Poly, Legato and HCut side by side below the logo, and the buttons below them
+  in two columns: Connect and Synth OS on the left, Pull, Push and Store patch on the right.
+
 ## [1.0.0] - 2026-11-01
 
 ### Added

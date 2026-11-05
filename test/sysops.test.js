@@ -155,3 +155,73 @@ test("capture (built into SidStation, hears all SysEx): a foreign or short frame
   assert.deepEqual(sent, [], "not passed on");
   assert.ok(logs.some((l) => /ERROR outgoing-type frame \(id 04\)/.test(l)));
 });
+
+const versionReply = (v) => H.concat([0x48], nib([v.length].concat(v)), [0xf7]);
+
+test("08 frame and the 48 reply: count first, later values skipped, strict shape; the Synth OS choice for a version", () => {
+  assert.deepEqual(S.encodeVersionRequest(), H.concat([8, 0xf7]));
+  assert.ok(S.validateVersionFrame(S.encodeVersionRequest()).ok);
+  assert.ok(!S.validateVersionFrame(H.concat([8, 0, 0xf7])).ok);
+  assert.deepEqual(versionReply([1, 12, 2]), H.concat([0x48, 3, 0, 1, 0, 0x0c, 0, 2, 0, 0xf7]), "as docs/protocol.md shows it");
+  const r = S.decodeReply(versionReply([1, 12, 2]));
+  assert.deepEqual([r.ok, r.major, r.minor, r.revision], [true, 1, 12, 2]);
+  const later = S.decodeReply(versionReply([1, 12, 3, 99]));
+  assert.deepEqual([later.ok, later.revision], [true, 3], "a fourth value from a later OS is skipped");
+  assert.ok(!S.decodeReply(versionReply([1, 12, 2]).slice(0, -3).concat([0xf7])).ok, "shorter than the count says");
+  assert.ok(!S.decodeReply(versionReply([1, 12])).ok, "fewer than three values");
+  const bad = versionReply([1, 12, 2]); bad[9] = 0x10; assert.ok(!S.decodeReply(bad).ok, "not a nibble");
+  assert.deepEqual(S.SYNTH_OS, ["OS <= 1.11", "1.12 R01", "1.12 R02"], "the stored choices: only append");
+  assert.deepEqual([[1, 12, 1], [1, 12, 2], [1, 12, 7], [1, 13, 0], [2, 0, 0], [1, 10, 33]].map((v) => S.synthOsIndex(...v)), [1, 2, 2, 2, 2, 0]);
+});
+
+test("08 passes the gateway and is timed; its missing reply is logged as expected from older OSes", () => {
+  const { w, out, status, warn, ticks, timeout } = loadGateway();
+  w.frame(...S.encodeVersionRequest());
+  assert.deepEqual(out, S.encodeVersionRequest());
+  w.frame(...H.concat([8, 1, 0xf7])); ticks(5);
+  assert.ok(status.some((s) => /REFUSED bus: version: wrong frame shape/.test(s)));
+  timeout();
+  assert.deepEqual(warn.splice(0), ["version"]);
+  assert.ok(status.some((s) => /version request: NO REPLY within 3000 ms \(expected with OS 1.12 R01/.test(s)));
+  w.frame(...S.encodeVersionRequest()); ticks(5); w.replied("version"); timeout();
+  assert.deepEqual(warn.splice(0), ["ok version"], "an answer in time ends the wait");
+});
+
+test("the capture passes a 48 reply on as version + replied; an echoed 08 is an error, not passed on", () => {
+  const sent = [], logs = [];
+  const g = { midiParser, sidlog: (...a) => logs.push(a.join(" ")), sidguard, ...S, inlets: 0, outlets: 0, post() {}, arrayfromargs: (a) => Array.from(a),
+    outlet: (o, ...a) => sent.push([o].concat(a)) };
+  const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.capture.js"), "utf8").replace(/^inlets = 1;\noutlets = 1;\n/m, "");
+  const cap = new Function(...Object.keys(g), src + "\nreturn { msg_int };")(...Object.values(g));
+  for (const b of versionReply([1, 12, 2])) cap.msg_int(b);
+  assert.deepEqual(sent.splice(0), [[0, "version", 1, 12, 2], [0, "replied", "version"]]);
+  assert.ok(logs.includes("capture version: OS 1.12 R02"));
+  for (const b of S.encodeVersionRequest()) cap.msg_int(b);
+  assert.deepEqual(sent, []);
+  assert.ok(logs.some((l) => /ERROR outgoing-type frame \(id 08\)/.test(l)));
+});
+
+function loadConnect() {
+  const out = [], logs = [];
+  const g = { sidlog: (...a) => logs.push(a.join(" ")), sidguard, ...S, inlets: 0, outlets: 0, post() {}, arrayfromargs: (a) => Array.from(a),
+    outlet: (o, ...a) => out.push([o].concat(a)) };
+  const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.connect.js"), "utf8").replace(/^inlets = 1;\noutlets = 3;\n/m, "");
+  const c = new Function(...Object.keys(g), src + "\nreturn { connect, version, answered, noreply };")(...Object.values(g));
+  return { c, out, logs };
+}
+
+test("Connect: 06 + 08 out; 48 -> its version, 46 only -> R01, nothing -> OS <= 1.11 with a notice; only a Connect sets the choice", () => {
+  const { c, out } = loadConnect();
+  c.connect();
+  assert.deepEqual(out.splice(0), [[1, "frame", ...S.encodeSettingsRequest()], [1, "frame", ...S.encodeVersionRequest()]]);
+  c.answered("settings"); c.version(1, 12, 2); c.answered("version");
+  assert.deepEqual(out.splice(0), [[0, 2]], "R02");
+  c.noreply("version"); c.version(1, 12, 2); c.answered("settings");
+  assert.deepEqual(out, [], "replies without a Connect (Pull's 06, late ones) change nothing");
+  c.connect(); out.splice(0); c.answered("settings"); c.noreply("version");
+  assert.deepEqual(out.splice(0), [[0, 1]], "R01 answers 06, not 08");
+  c.connect(); out.splice(0); c.noreply("settings"); c.noreply("version");
+  assert.deepEqual(out.splice(0), [[0, 0], [2, "say", "No reply: set to OS <= 1.11", "(or the synth is not connected)."]]);
+  c.connect(); out.splice(0); c.version(1, 14, 0);
+  assert.deepEqual(out.splice(0), [[0, 2]], "a newer OS than the editor knows: the newest it knows");
+});

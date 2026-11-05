@@ -153,16 +153,18 @@ function buildDevice(title) {
   }
   lines.push(A.line(vMidiin, 0, oscs[1].vV8, 0));
   // To the synth. The routers send "frame <bytes…>" on an outlet of their own (osc: 2, filter/LFO: 1).
-  const routers = OSCS.map((n) => [oscs[n].vV8, 2]).concat([[vFilter, 1], [vLfo, 1]]);
+  const routers = OSCS.map((n) => [oscs[n].vV8, 2]).concat([[vFilter, 1], [vLfo, 1], [ctx.connectId, 1]]);
   {
     // One track, with the same protection as separate devices would give: the gateway and the capture (formerly the SidSend and SidCapture devices) are built in. Everything to the synth – the routers' frames and the
     // track's notes – goes through the gateway (validation, whitelist, one queue, store lock) and out of the device's own
     // [midiout] (on to the track's MIDI To). The track's input goes to the capture (dumps saved, patches/replies to the loader
     // and the gateway, nothing global) and to the osc 1 router, which passes notes and drops SysEx (the echo rule).
+    const vVersionPre = id();
+    boxes.push(A.obj(vVersionPre, "prepend version", [370, 120, 90, 20]));
     const vGate = id(), vCap = id(), vStored = id(), vStoredPre = id(), vCapRoute = id(), vRepliedPre = id(), vGateRoute = id(), vNoReplyPre = id(), vAnsweredPre = id(), vSentMsg = id();
     boxes.push(A.obj(vGate, "v8 sid.send.js", [30, 500, 100, 20], 2, ["", ""], { varname: "gateway" }),
       A.obj(vCap, "v8 sid.capture.js", [200, 60, 110, 20], 1, [""], { varname: "capture" }),
-      A.obj(vCapRoute, "route stored replied", [200, 90, 120, 20], 3, ["", "", ""]), A.obj(vStoredPre, "prepend stored", [200, 120, 90, 20]),
+      A.obj(vCapRoute, "route stored replied version", [200, 90, 160, 20], 4, ["", "", "", ""]), A.obj(vStoredPre, "prepend stored", [200, 120, 90, 20]),
       A.obj(vRepliedPre, "prepend replied", [300, 120, 90, 20]), A.obj(vGateRoute, "route noreply answered sent", [140, 530, 200, 20], 4, ["", "", "", ""]), A.obj(vNoReplyPre, "prepend noreply", [140, 560, 100, 20]),
       A.obj(vAnsweredPre, "prepend answered", [250, 560, 100, 20]), A.msg(vSentMsg, "outside", [360, 560, 50, 20]),
       A.obj(vStored, "t l l", [320, 90, 40, 20], 2, ["", ""]));
@@ -170,6 +172,9 @@ function buildDevice(title) {
       A.line(vCapRoute, 0, vStoredPre, 0), A.line(vStoredPre, 0, vGate, 0), A.line(vCapRoute, 1, vRepliedPre, 0), A.line(vRepliedPre, 0, vGate, 0),
       A.line(vGate, 1, vGateRoute, 0), A.line(vGateRoute, 0, vNoReplyPre, 0), A.line(vNoReplyPre, 0, ctx.nameId, 0), A.line(vGateRoute, 1, vAnsweredPre, 0), A.line(vAnsweredPre, 0, ctx.nameId, 0),
       A.line(vGateRoute, 2, vSentMsg, 0), A.line(vSentMsg, 0, ctx.nameId, 0),
+      // Connect (sid.connect.js): which requests were answered, the 48 reply, and its notice in the overview
+      A.line(vNoReplyPre, 0, ctx.connectId, 0), A.line(vAnsweredPre, 0, ctx.connectId, 0),
+      A.line(vCapRoute, 2, vVersionPre, 0), A.line(vVersionPre, 0, ctx.connectId, 0), A.line(ctx.connectId, 2, ctx.mapId, 0),
       A.line(oscs[1].vV8, 0, vGate, 0), A.line(vGate, 0, vMidiout, 0));
     for (const [r, k] of routers) lines.push(A.line(r, k, vGate, 0));
   }
@@ -208,7 +213,7 @@ const LAYOUTS = {};
     + "the patch as stored, so the editor takes it) or to press Push patch, before shaping a sound. A program must never choose Pull patch or Push patch "
     + "unless the user asks for it, and must never choose Store patch unless the user explicitly asks to store. Pull patch replaces every setting in the editor with the "
     + "patch number the synth shows; Push patch sends the whole editor state together, for example after a saved set has been loaded (loading sends nothing); Store patch "
-    + "overwrites the patch number the synth shows for good with what the synth has, so Push patch comes first when the editor's sound is the one to keep. Patch Action (None, Pull patch, Push patch, Store patch) presses those buttons and goes back to None by itself. Each waveform table is the parameters Osc n Step 00 to Osc n Step 64 (one per cell of the synth's table, "
+    + "overwrites the patch number the synth shows for good with what the synth has, so Push patch comes first when the editor's sound is the one to keep. Patch Action (None, Pull patch, Push patch, Store patch, Connect) presses those buttons and goes back to None by itself; Connect asks the synth which OS it runs and sets Synth OS, which the user can also set by hand. Each waveform table is the parameters Osc n Step 00 to Osc n Step 64 (one per cell of the synth's table, "
     + "value DATA1 * 256 + DATA2; 65280 = End, 65024 + t = Loop to step t; the device guide explains a step): read them to see a table, write them to change it. "
     + "A table plays only while Table Speed is above 0. Osc n Table Data only carries a table from an older editor into the Step parameters; "
     + "Osc n Table Clear empties the table and sets Table Speed to 0, so never choose it unless the user asks. Parameters with the values hidden/shown only show or hide panels and do not change the sound. The patch name is Name 1 to Name 10 "
@@ -225,9 +230,10 @@ writeIfChanged(path.join(OUT_DIR, "sid.lfo.js"), ["lib/maxlog.js", "lib/sysex.js
 writeIfChanged(path.join(OUT_DIR, "sid.send.js"), ["const SID_DEV = " + !RELEASE + ";", ...["lib/maxlog.js", "lib/sysex.js", "lib/params.js", "lib/midi.js", "max/sid.send.js"].map(read)].join("\n\n"));     // the gateway
 writeIfChanged(path.join(OUT_DIR, "sid.capture.js"), ["lib/maxlog.js", "lib/sysex.js", "lib/midi.js", "max/sid.capture.js"].map(read).join("\n\n"));   // the capture
 writeIfChanged(path.join(OUT_DIR, "sid.load.js"), ["lib/maxlog.js", "lib/params.js", "max/sid.load.js"].map(read).join("\n\n"));
+writeIfChanged(path.join(OUT_DIR, "sid.connect.js"), ["lib/maxlog.js", "lib/sysex.js", "max/sid.connect.js"].map(read).join("\n\n"));       // Connect
 writeIfChanged(path.join(OUT_DIR, "sid.version.js"), ["lib/maxlog.js", "max/sid.version.js"].map(read).join("\n\n"));         // the version in the set
 writeIfChanged(path.join(OUT_DIR, "sid.layout.js"), [read("lib/maxlog.js"), read("lib/layout.js"), "const LAYOUTS = " + JSON.stringify(LAYOUTS) + ";\n", read("max/sid.layout.js")].join("\n\n"));
-for (const f of ["sid.adsr.js", "sid.pulse.js", "sid.note.js", "sid.map.js", "sid.fold.js", "sid.section.js", "sid.filtcurve.js", "sid.legend.js", "sid.vslider.js", "sid.name.js", "sid.lfoview.js", "sid.table.js", "sid.voicebg.js", "sid.tablenote.js", "sid.lfotabs.js", "sid.loopbtn.js", "sid.litbtn.js", "sid.activebtn.js", "sid.dimbtn.js", "sid.tip.js"]) writeIfChanged(path.join(OUT_DIR, f), ["lib/maxlog.js", "lib/ui.js", ...(f === "sid.map.js" ? ["lib/liveparam.js"] : []), "max/" + f].map(read).join("\n\n").replace("\n\n// sid.name.js", "\n\nconst DEVICE_NAME = " + JSON.stringify(DEVICE) + ";\nconst DEVICE_TITLE = " + JSON.stringify(DEVICE + " " + VERSION) + ";\n\n// sid.name.js"));   // + the shared palette (and the device name for sid.name.js)
+for (const f of ["sid.adsr.js", "sid.pulse.js", "sid.note.js", "sid.map.js", "sid.fold.js", "sid.section.js", "sid.filtcurve.js", "sid.legend.js", "sid.vslider.js", "sid.name.js", "sid.lfoview.js", "sid.table.js", "sid.voicebg.js", "sid.tablenote.js", "sid.lfotabs.js", "sid.loopbtn.js", "sid.litbtn.js", "sid.activebtn.js", "sid.dimbtn.js", "sid.tip.js", "sid.logo.js"]) writeIfChanged(path.join(OUT_DIR, f), ["lib/maxlog.js", "lib/ui.js", ...(f === "sid.map.js" ? ["lib/liveparam.js"] : []), "max/" + f].map(read).join("\n\n").replace("\n\n// sid.name.js", "\n\nconst DEVICE_NAME = " + JSON.stringify(DEVICE) + ";\nconst DEVICE_TITLE = " + JSON.stringify(DEVICE + " " + VERSION) + ";\n\n// sid.name.js"));   // + the shared palette (and the device name for sid.name.js)
 copyIfChanged(path.join(__dirname, "..", "docs", "device-guide.md"), path.join(OUT_DIR, GUIDE));   // next to the device; freeze.js embeds it
 for (const f of fs.readdirSync(path.join(__dirname, "..", "max", "icons"))) copyIfChanged(path.join(__dirname, "..", "max", "icons", f), path.join(OUT_DIR, f));
 console.log("wrote dist/sid.osc.js, sid.layout.js, widgets, icons");

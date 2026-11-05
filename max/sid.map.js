@@ -159,6 +159,12 @@ const noticeOn = new Task(() => {
 }, this);
 noticeOn.schedule(NOTICE_AFTER_MS);
 function showTip() { const t = tip || notice; if (t) outlet(1, "tip", t.x, t.y, ...t.lines); else outlet(1, "tip"); }
+// "say <line> …": a notice in the same place for NOTICE_MS (from sid.connect.js), replacing the load notice
+function say() {
+  noticeOn.cancel(); noticeOff.cancel();
+  notice = { x: -6, y: 166, lines: arrayfromargs(arguments).map(String) };
+  showTip(); noticeOff.schedule(NOTICE_MS);
+}
 // What is under the mouse, including things that cannot be clicked? -> text or null
 function hoverText(x, y) {
   for (let i = 0; i < 3; i++) {
@@ -255,5 +261,5 @@ function bang() {
 function onresize() { mgraphics.redraw(); }
 function anything() { post("sid.map: unknown message " + messagename + "\n"); }
 
-paint = sidguard("map", paint); onclick = sidguard("map", onclick); set = sidguard("map", set); onidle = sidguard("map", onidle);
+paint = sidguard("map", paint); onclick = sidguard("map", onclick); set = sidguard("map", set); onidle = sidguard("map", onidle); say = sidguard("map", say);
 sidlog("map", "loaded");
