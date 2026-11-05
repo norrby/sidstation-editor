@@ -19,7 +19,14 @@ All notable changes to SidStation Editor are listed here, newest first. The form
 ### Changed
 
 - **The patch column**: Poly, Legato and HCut side by side below the logo, and the buttons below them
-  in two columns: Connect and Synth OS on the left, Pull, Push and Store patch on the right.
+  in two columns: Synth OS on the left, Connect, Pull, Push and Store patch on the right.
+- **The overview**: "out" sits right of where the outputs meet under the filter, and the diagram is
+  centred in its panel. The patch name's dots look centred in their display.
+
+### Fixed
+
+- **Editing the patch name** no longer adds a quote: a name with a blank in it came into the text
+  field in quotes, and the quote became part of the name on Return.
 
 ## [1.0.0] - 2026-11-01
 

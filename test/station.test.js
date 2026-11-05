@@ -58,16 +58,16 @@ test("filter router: nothing before arm; routing and type as fields; CC for cuto
 test("overview: Osc shows/hides, Env per osc (only when the osc is shown), switches and arrows toggle; set is silent", () => {
   const { w, out } = loadUi("sid.map.js", [230, 163], "paint, onclick, set, bang, G");
   const G = w.G;
-  w.onclick(46, G.rows[1]); assert.deepEqual(out.splice(0), ["show 2 1"]);
-  w.onclick(93, G.rows[1]); assert.deepEqual(out.splice(0), ["env 2 0"]);                                  // Env unfolds/folds the envelope panel
-  w.onclick(46, G.rows[0]); assert.deepEqual(out.splice(0), ["show 1 0"]);                                 // zero shown is allowed
-  w.onclick(130, G.rows[1]); assert.deepEqual(out.splice(0), ["route 2 0"]);                             // osc 1/2: two positions, a click toggles
-  w.onclick(130, G.rows[1]); assert.deepEqual(out.splice(0), ["route 2 1"]);
+  w.onclick(46 + 12, G.rows[1]); assert.deepEqual(out.splice(0), ["show 2 1"]);
+  w.onclick(93 + 12, G.rows[1]); assert.deepEqual(out.splice(0), ["env 2 0"]);                                  // Env unfolds/folds the envelope panel
+  w.onclick(46 + 12, G.rows[0]); assert.deepEqual(out.splice(0), ["show 1 0"]);                                 // zero shown is allowed
+  w.onclick(130 + 12, G.rows[1]); assert.deepEqual(out.splice(0), ["route 2 0"]);                             // osc 1/2: two positions, a click toggles
+  w.onclick(130 + 12, G.rows[1]); assert.deepEqual(out.splice(0), ["route 2 1"]);
   // osc 3: three positions (3OFF); each click steps filter -> out -> off -> filter, wherever on the switch (the ground symbol too)
-  w.onclick(130, G.rows[2]); assert.deepEqual(out.splice(0), ["route 3 0", "off3 0"]);
-  w.onclick(143, G.rows[2] + 14); assert.deepEqual(out.splice(0), ["route 3 0", "off3 1"]);
-  w.onclick(130, G.rows[2] - 9); assert.deepEqual(out.splice(0), ["route 3 1", "off3 0"]);
-  w.onclick(130, G.rows[2]); out.splice(0);                                                          // leave osc 3 on out for the rest
+  w.onclick(130 + 12, G.rows[2]); assert.deepEqual(out.splice(0), ["route 3 0", "off3 0"]);
+  w.onclick(143 + 12, G.rows[2] + 14); assert.deepEqual(out.splice(0), ["route 3 0", "off3 1"]);
+  w.onclick(130 + 12, G.rows[2] - 9); assert.deepEqual(out.splice(0), ["route 3 1", "off3 0"]);
+  w.onclick(130 + 12, G.rows[2]); out.splice(0);                                                          // leave osc 3 on out for the rest
   w.onclick((G.filt[0] + G.filt[1]) / 2, 80); assert.deepEqual(out.splice(0), ["filter 0"]);          // the Filter box folds the filter panel
   w.onclick((G.fenv[0] + G.fenv[1]) / 2, G.fenvY); assert.deepEqual(out.splice(0), ["fenv 0"]);       // the Env box by the filter folds the filter envelope
   w.onclick(G.laneSync, (G.rows[0] + G.rows[1]) / 2); assert.deepEqual(out.splice(0), ["sync 2 1"]);      // 1 -> 2: target osc 2

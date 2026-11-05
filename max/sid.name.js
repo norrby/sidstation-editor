@@ -64,11 +64,15 @@ const born = Date.now();   // clicks during loading are ignored (see sid.fold.js
 
 function geom() {
   const W = mgraphics.size[0], H = mgraphics.size[1], pad = 3, gap = 1;
-  const cw = (W - 2 * pad - (N - 1) * gap) / N;            // cell width ~13 px -> dot pitch ~2.6 px
-  const pitch = cw / COLS, top = Math.max(2, (H - 5 - ROWS * pitch) / 2);
-  return { W, H, pad, gap, cw, pitch, top };
+  const Wd = W - 1;                                        // the dots 1 px narrower, all of it taken from the right
+  const cw = (Wd - 2 * pad - (N - 1) * gap) / N;           // cell width ~13 px -> dot pitch ~2.6 px
+  const pitch = cw / COLS, dot = pitch * 0.78;
+  // The dots centred both ways (a cell's last dot ends a dot gap before the cell does; the cursor, 2 px at the bottom, fits below),
+  // then 1 px up and 1 px right: centred exactly, a name's lit dots looked low and left (most weight in the lower rows, lit from the left).
+  const left = (Wd - (N * cw + (N - 1) * gap - (pitch - dot))) / 2 + 1, top = (H - ((ROWS - 1) * pitch + dot)) / 2 - 1;
+  return { W, H, pad, gap, cw, pitch, top, left };
 }
-function cellX(g, i) { return g.pad + i * (g.cw + g.gap); }
+function cellX(g, i) { return g.left + i * (g.cw + g.gap); }
 function glyphOf(code) { const ch = String.fromCharCode(code); return FONT[ch] || FONT["?"]; }
 // A missed reply (to any request that expects an answer) is shown where the eye already is
 // after Pull: the name display, in the warning colour; the name itself is untouched. It stays until a reply comes in or the
@@ -107,7 +111,9 @@ function apply(i, code, silent) {
   if (!silent) outlet(0, "namechar", i + 1, code);
   return true;
 }
-function syncEdit() { outlet(1, "set", text().replace(/\s+$/, "")); }      // textedit follows along (silently)
+// textedit follows along (silently). Word by word: one symbol with a blank in it shows in the field in quotes, and the quote
+// became part of the name when it was typed. A run of blanks inside a name comes back as one.
+function syncEdit() { const t = text().trim(); outlet.apply(null, [1, "set"].concat(t ? t.split(/\s+/) : [])); }
 // The device takes the patch name as its own name, so Push shows it in its header (an empty name gives the device's own name and version, DEVICE_TITLE from the build). Set once,
 // 300 ms after the last change: a dump sets ten characters one by one, and every rename is a step in Live's undo history.
 let renameTask = null;

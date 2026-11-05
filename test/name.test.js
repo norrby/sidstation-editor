@@ -12,12 +12,13 @@ function loadWidget() {
   for (const f of ["set_source_rgba", "rectangle", "rectangle_rounded", "fill", "set_line_width", "move_to", "line_to", "stroke"]) mg[f] = () => {};
   const scripts = [], tasks = [];
   class Task { constructor(fn) { this.fn = fn; tasks.push(this); } schedule(ms) { this.due = ms; } cancel() {} }
-  const g = { Task, UI, sidlog, sidguard, mgraphics: mg, inlets: 0, outlets: 0, post() {}, outlet: (o, ...a) => (o === 2 ? scripts : out).push(a.join(" ")), arrayfromargs: (a) => Array.from(a), messagename: "x", Date,
+  const atoms = [];
+  const g = { Task, UI, sidlog, sidguard, mgraphics: mg, inlets: 0, outlets: 0, post() {}, outlet: (o, ...a) => { if (o === 1) atoms.push(a); (o === 2 ? scripts : out).push(a.join(" ")); }, arrayfromargs: (a) => Array.from(a), messagename: "x", Date,
     jsarguments: ["sid.name.js", 4, 127, 144, 30] };
   const src = fs.readFileSync(path.join(__dirname, "..", "max", "sid.name.js"), "utf8").replace(/^inlets = 1;\noutlets = 1;\n/m, "").replace("const born = Date.now();", "const born = 0;");
   const w = new Function(...Object.keys(g), src + "\nreturn { set, bang, text, paint, typed, onclick, outside, noreply, answered, FONT, SET, geom, get warning() { return warning; } };")(...Object.values(g));
   w.patcher = { getnamed: (n) => ({ getattr: (a) => (n === "name" && a === "presentation_rect" ? [490, 127, 144, 30] : null) }) };   // the layout engine's position, not the build's
-  return { w, out, scripts, tasks };
+  return { w, out, scripts, tasks, atoms };
 }
 
 test("set name pads to ten characters, set char is silent but syncs textedit, bang sends all", () => {
@@ -45,7 +46,7 @@ test("a click opens the field (script + select), Return sends the whole name (te
   const edit = (...a) => { w.onclick(10, 10); out.splice(0); scripts.splice(0); w.typed(...a); };   // every Return comes from an open field
   w.onclick(10, 10);
   assert.deepEqual(scripts.splice(0), ["script sendbox name presentation 0", "script sendbox nameedit presentation 1", "script sendbox nameedit presentation_rect 490 127 144 30", "script bringtofront nameedit"]);
-  assert.deepEqual(out.splice(0), ["set ", "select"], "the field is set to the current name (blank) before it gets focus");
+  assert.deepEqual(out.splice(0), ["set", "select"], "the field is set to the current name (blank) before it gets focus");
   w.typed("Oi");
   const all = (t) => [...t.padEnd(10)].map((c, i) => "namechar " + (i + 1) + " " + c.charCodeAt(0));
   assert.deepEqual(out.splice(0), all("Oi"));
@@ -131,4 +132,12 @@ test("noreply shows NO REPLY until a reply comes in, without touching the name; 
   assert.ok(!w.warning, "a click to edit clears the warning");
   w.noreply("settings");
   assert.ok(!w.warning, "not shown while the field is open");
+});
+
+test("the text field gets the name word by word: one symbol with a blank showed in quotes, and the quote became part of the name", () => {
+  const { w, atoms } = loadWidget();
+  w.set("name", "New", "Patch");
+  assert.deepEqual(atoms.pop(), ["set", "New", "Patch"]);
+  w.set("name", " ");
+  assert.deepEqual(atoms.pop(), ["set"], "an empty name empties the field");
 });

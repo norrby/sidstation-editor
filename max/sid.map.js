@@ -28,8 +28,13 @@ outlets = 2;   // 0: the switches, 1: "tip …" to the tooltip layer (sid.tip.js
 // it was too heavy next to the dot letters, 18 px too small: now as tall as the diagram's other boxes (22 px),
 // centred on the name display (NAME_RECT y 7..33 here), as wide as the filter. The filter moved right (and 4 px narrower, "out"
 // must fit) to give the switches' wires room.
-const G = { rows: [51, 91, 131], boxH: 22, osc: [26, 66], env: [76, 110], pivot: 122, bus: 153, filt: [166, 200], filtY: [40, 150], fenv: [166, 200], fenvY: 20, fenvH: 22, outY: 155,
-  laneSync: 40, laneRing: 52, wrapSync: 8, wrapRing: 16 };
+// The out bus joins under the filter (the filter 14 px shorter for it) and "out" stands right of the joint, only a little past the
+// filter's right edge; the whole diagram is moved DX to the right (as much room left of the Sync arrow as right of the filter) and
+// DY down, the name display with it (overview.js NAME_RECT).
+const DX = 12, DY = 3;
+const G = { rows: [51 + DY, 91 + DY, 131 + DY], boxH: 22, osc: [26 + DX, 66 + DX], env: [76 + DX, 110 + DX], pivot: 122 + DX, bus: 153 + DX, filt: [166 + DX, 200 + DX],
+  filtY: [40 + DY, 136 + DY], fenv: [166 + DX, 200 + DX], fenvY: 20 + DY, fenvH: 22, outY: 144 + DY,
+  laneSync: 40 + DX, laneRing: 52 + DX, wrapSync: 8 + DX, wrapRing: 16 + DX };
 // boxFill: unlit boxes are filled dark like Live's unlit buttons, not hollow.
 const C = { box: [1, 1, 1, 0.35], boxFill: [0.07, 0.07, 0.07, 0.6], boxOn: UI.lit, text: [1, 1, 1, 0.8], textOn: UI.dark, off: [1, 1, 1, 0.25],
   sync: UI.line, ring: UI.lit, wire: [1, 1, 1, 0.55], wireOn: UI.line, envOff: [1, 1, 1, 0.15] };
@@ -113,13 +118,14 @@ function paint() {
   const ft = "Filter", fw = measure(ft);
   mgraphics.move_to((G.filt[0] + G.filt[1]) / 2 - fw / 2, (G.filtY[0] + G.filtY[1]) / 2 + 3); mgraphics.show_text(ft);
   ink(C.wire); mgraphics.set_line_width(1);
-  mgraphics.move_to(G.bus, G.rows[0] - SW.cby); mgraphics.line_to(G.bus, G.outY); mgraphics.line_to(G.filt[1] + 4, G.outY); mgraphics.stroke();     // direct bus -> out
-  mgraphics.move_to(G.filt[1] - 4, G.filtY[1]); mgraphics.line_to(G.filt[1] - 4, G.outY); mgraphics.stroke();                                  // filter -> out
+  const ox = (G.filt[0] + G.filt[1]) / 2;                                                                                                      // out, under the filter
+  mgraphics.move_to(G.bus, G.rows[0] - SW.cby); mgraphics.line_to(G.bus, G.outY); mgraphics.line_to(ox, G.outY); mgraphics.stroke();     // direct bus -> out
+  mgraphics.move_to(ox, G.filtY[1]); mgraphics.line_to(ox, G.outY); mgraphics.line_to(ox + 4, G.outY); mgraphics.stroke();               // filter -> out
   // the filter envelope: Env box above the filter with a short arrow down into it (modulates cutoff, not in the signal path)
   drawBox(G.fenv[0], G.fenv[1], G.fenvY, "Env", filterEnv === 1, false, G.fenvH);
   const fx = (G.fenv[0] + G.fenv[1]) / 2;
   ink(C.wire); mgraphics.move_to(fx, G.fenvY + G.fenvH / 2); mgraphics.line_to(fx, G.filtY[0] - 1); mgraphics.stroke(); head(fx, G.filtY[0] - 1, 0, 1);
-  ink(C.text); mgraphics.move_to(G.filt[1] + 7, G.outY + 3); mgraphics.show_text("out");
+  ink(C.text); mgraphics.move_to(ox + 6, G.outY + 3); mgraphics.show_text("out");
   for (let i = 0; i < 3; i++) {
     const y = G.rows[i];
     greyNow = silent(i);

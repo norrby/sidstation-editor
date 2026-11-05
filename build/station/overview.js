@@ -10,7 +10,7 @@ const MAP_W = 230;
 const PCOL_BTN = 60;                                           // the Patch column's button width: "Send patch" was clipped at 52 px
 // Two columns left of the diagram. At the top the sound's settings on a tongue that joins them to the diagram: Poly and Legato
 // on the left, HCut on the right. Below it a grid of buttons, rows of BTN_H every ROW px, ending at the frame's bottom: on the
-// left the synth (Connect, Synth OS), on the right the patch (Pull, Push, Store).
+// right Connect, Pull, Push and Store, on the left Synth OS level with Pull, Push and Store.
 const LOGO_RECT = [PAD, 4, 124, 32];                            // the logo (sid.logo.js) top left; the tongue and the buttons below it
 const SCOL_W = PAD + PCOL_BTN + 4;
 const COLX = SCOL_W + PAD;                                       // the right column
@@ -18,10 +18,10 @@ const PCOL_W = COLX + PCOL_BTN;                                  // both columns
 const BTN_H = 15, ROW = 18, ROW0 = 165 - 4 * ROW + (ROW - BTN_H);  // four rows, the last ending at 165
 const TY = 34;                                                   // the tongue, below the logo
 const btnRow = (i) => ROW0 + i * ROW;
-const CONNECT_RECT = [PAD, btnRow(0), PCOL_BTN, BTN_H];
+const CONNECT_RECT = [COLX, btnRow(0), PCOL_BTN, BTN_H];          // above Pull patch
 const SYNTHOS_RECT = [PAD, btnRow(1), PCOL_BTN, 3 * ROW - (ROW - BTN_H)];   // three tab rows of BTN_H, 3 px apart
 const MAP_TOTAL = PCOL_W + MAP_W;                              // the overview box: Patch column + the diagram
-const NAME_RECT = [PCOL_W + 10, FRAME_Y + 7, 144, 26];         // the name display top left in the diagram, above Osc 1 (the Env box sits above the filter), inside MAP_INNER
+const NAME_RECT = [PCOL_W + 22, FRAME_Y + 10, 144, 26];        // moved with the diagram (sid.map.js DX, DY)         // the name display top left in the diagram, above Osc 1 (the Env box sits above the filter), inside MAP_INNER
 // The overview like the voices: the Patch column on the
 // device background, the diagram on a darker inner panel like the voices' sub-panels; the voices' dividers separate them.
 const MAP_INNER = [PCOL_W + 6, INNER_Y, MAP_W - 10, INNER_H];         // 3 px clear of the Patch column with the halo
